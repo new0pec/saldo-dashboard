@@ -137,12 +137,28 @@
     if (!tok) throw new Error('Liga o Dropbox nas definições.');
     const r = await fetch(url, { method: 'POST', ...opts, headers: { Authorization: 'Bearer ' + tok, ...(opts && opts.headers) } });
     if (r.status === 401) { store.del(CFG.tok); throw new Error('A sessão do Dropbox expirou. Liga outra vez.'); }
-    if (!r.ok) { const t = await r.text(); throw new Error('Erro do Dropbox (' + r.status + '): ' + t.slice(0, 160)); }
+    if (!r.ok) {
+      const t = await r.text(); let j = {}; try { j = JSON.parse(t); } catch (e) {}
+      const err = new Error(j.error_summary ? 'Dropbox: ' + j.error_summary.replace(/\/\.*$/, '') : 'Erro do Dropbox (' + r.status + ')');
+      err.summary = j.error_summary || ''; err.status = r.status;
+      throw err;
+    }
     return r;
   }
 
+  async function listFolder(path) {
+    return dbx('https://api.dropboxapi.com/2/files/list_folder', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, recursive: false }) });
+  }
+
   async function latestFromDropbox() {
-    let r = await dbx('https://api.dropboxapi.com/2/files/list_folder', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: folder(), recursive: false }) });
+    let r;
+    try { r = await listFolder(folder()); }
+    catch (e) {
+      if (!/not_found/.test(e.summary || '')) throw e;
+      let visiveis = [];
+      try { const raiz = await (await listFolder('')).json(); visiveis = raiz.entries.filter(x => x['.tag'] === 'folder').map(x => x.path_display); } catch (e2) {}
+      throw new Error('Pasta ' + folder() + ' não encontrada. ' + (visiveis.length ? 'Pastas visíveis: ' + visiveis.slice(0, 6).join(', ') + '.' : 'A app só vê uma pasta vazia: cria-a com acesso Full Dropbox (ver README).'));
+    }
     let j = await r.json(); let entries = j.entries;
     while (j.has_more) {
       r = await dbx('https://api.dropboxapi.com/2/files/list_folder/continue', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cursor: j.cursor }) });
