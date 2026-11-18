@@ -1,0 +1,9 @@
+{
+  "name": "Saldo — Finanças",
+  "short_name": "Saldo",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fbf3ee",
+  "theme_color": "#FF9F0A",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
