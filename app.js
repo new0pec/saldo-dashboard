@@ -595,7 +595,11 @@
   function fDesenha() {
     $('f-title').textContent = F.tipo;
     $('f-tipo').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === F.tipo));
-    $('f-valor').textContent = L.format(',.2f')(F.valor ? parseFloat(F.valor.replace(',', '.')) || 0 : 0);
+    const sinal = F.tipo === 'Receita' ? '+' : F.tipo === 'Despesa' ? '−' : '';
+    const calcAberta = !$('calc').hidden;
+    $('f-valor').textContent = calcAberta ? (C ? sinal + ' ' + bonito(C) : sinal || '0') : (F.valor && parseFloat(F.valor.replace(',', '.')) ? sinal + ' ' + L.format(',.2f')(parseFloat(F.valor.replace(',', '.'))) : (sinal || '0'));
+    $('f-valor-res').textContent = calcAberta && temOp(C) ? '= ' + L.format(',.2f')(calcAvalia(C)) : '';
+    if (calcAberta) calcFaixa();
     $('f-conta').textContent = F.conta || 'Escolher';
     $('f-cat').textContent = F.categoria || 'Sem';
     $('f-etq').textContent = F.etiquetas || 'Sem';
@@ -622,7 +626,7 @@
     $('f-titulo').value = fEdit ? base.titulo || '' : ''; $('f-receb').value = fEdit ? base.recebedor || '' : ''; $('f-uso').value = fEdit ? base.uso || '' : '';
     $('f-del').hidden = !fEdit; $('f-msg').textContent = '';
     fDesenha();
-    fechar('sh-quick'); abrir('sh-form');
+    fecharCalc(); C = ''; abrir('sh-form');
   }
 
   // Lista de escolha (conta, categoria, hashtags, repetir)
@@ -678,21 +682,68 @@
   $('f-rep-btn').addEventListener('click', () => pick({ titulo: 'Repetir', atual: F.repetir || 'nunca', semPesquisa: true,
     opcoes: Object.entries(REP).map(([v, label]) => ({ v, label, ini: '↻', cor: '#BF5AF2' })), fim: v => { F.repetir = v; } }));
 
-  // Teclado do montante
-  let K = '';
-  const kDesenha = () => { $('k-val').textContent = fmtMontante(K) + ' €'; };
-  function teclado(contentor, obter, definir, depois) {
-    contentor.replaceChildren(...KEYS.map(k => { const b = el('button', 'key', k); b.type = 'button'; if (k === '⌫') b.setAttribute('aria-label', 'Apagar'); b.onclick = () => {
-      let s = obter();
-      if (k === '⌫') s = s.slice(0, -1);
-      else if (k === ',') { if (!s.includes(',')) s = (s || '0') + ','; }
-      else { const dec = s.split(',')[1]; if (dec != null && dec.length >= 2) return; if (s.replace(',', '').length >= 8) return; s = (s === '0' ? '' : s) + k; }
-      definir(s); depois(); }; return b; }));
+  // Teclado calculadora (estilo MoneyStats), preso ao fundo do formulário
+  const OPS = '+−×÷';
+  let C = '';
+  function calcAvalia(s) {
+    const t = String(s || '').match(/\d+(?:,\d*)?|[+−×÷]/g) || [];
+    while (t.length && OPS.includes(t[t.length - 1])) t.pop();
+    if (!t.length || OPS.includes(t[0])) return 0;
+    const v = t.map(x => OPS.includes(x) ? x : parseFloat(x.replace(',', '.')) || 0);
+    const p = [v[0]];
+    for (let i = 1; i < v.length; i += 2) {
+      const o = v[i], n = v[i + 1];
+      if (o === '×') p[p.length - 1] *= n; else if (o === '÷') p[p.length - 1] = n ? p[p.length - 1] / n : 0; else p.push(o, n);
+    }
+    let r = p[0]; for (let i = 1; i < p.length; i += 2) r = p[i] === '+' ? r + p[i + 1] : r - p[i + 1];
+    return Math.round(r * 100) / 100;
   }
-  $('f-valor-btn').addEventListener('click', () => { K = F.valor || ''; kDesenha(); abrir('sh-kp'); });
-  $('k-ok').addEventListener('click', () => { F.valor = K; fechar('sh-kp'); fDesenha(); });
+  const temOp = s => /[+−×÷]/.test(String(s || '').replace(/^[+−×÷]/, ''));
+  const bonito = s => String(s || '').replace(/\d+/g, (d, i, all) => all[i - 1] === ',' ? d : L.format(',')(+d)).replace(/([+−×÷])/g, ' $1 ');
+  function calcTecla(k) {
+    let s = C;
+    const ultimo = s.slice(-1), numAtual = (s.match(/[\d,]*$/) || [''])[0];
+    if (k === 'AC') s = '';
+    else if (k === '⌫') s = s.slice(0, -1);
+    else if (k === '±') { F.tipo = F.tipo === 'Receita' ? 'Despesa' : 'Receita'; }
+    else if (OPS.includes(k)) { if (!s) return; s = OPS.includes(ultimo) ? s.slice(0, -1) + k : (ultimo === ',' ? s.slice(0, -1) : s) + k; }
+    else if (k === ',') { if (numAtual.includes(',')) return; s += numAtual ? ',' : '0,'; }
+    else { const dec = numAtual.split(',')[1]; if (dec != null && dec.length >= 2) return; if (numAtual.replace(',', '').length >= 9) return; s = (numAtual === '0' ? s.slice(0, -1) : s) + k; }
+    C = s; F.valor = String(calcAvalia(C)).replace('.', ','); fDesenha();
+  }
+  const CALC_ESQ = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '±', ',', '0', '⌫'];
+  const CALC_DIR = ['+', '−', '×', '÷', 'AC'];
+  (function montaCalc() {
+    const esq = el('div', 'c-esq'), dir = el('div', 'c-dir');
+    for (const k of CALC_ESQ) {
+      const b = el('button', 'c-key' + (k === '±' || k === ',' ? ' c-mini' : '') + (k === '⌫' ? ' c-fn' : ''), k === '⌫' ? '' : k); b.type = 'button';
+      if (k === '⌫') { b.setAttribute('aria-label', 'Apagar'); b.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M9 5h11a1 1 0 011 1v12a1 1 0 01-1 1H9l-6-7z M12 9l6 6M18 9l-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>'; }
+      if (k === '±') b.setAttribute('aria-label', 'Trocar despesa e receita');
+      b.addEventListener('click', () => calcTecla(k)); esq.append(b);
+    }
+    for (const k of CALC_DIR) { const b = el('button', 'c-key c-op', k === '−' ? '-' : k); b.type = 'button'; if (k === 'AC') b.setAttribute('aria-label', 'Limpar'); b.addEventListener('click', () => calcTecla(k)); dir.append(b); }
+    $('c-grid').replaceChildren(esq, dir);
+  })();
+  const abrev = s => { const w = String(s).replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(' ').filter(Boolean); return w.length > 1 ? (w[0][0] + w[1][0]).toUpperCase() : (w[0] || '?').slice(0, 2).replace(/^./, c => c.toUpperCase()); };
+  function calcFaixa() {
+    const tipo = F.tipo === 'Receita' ? 'Receita' : 'Despesa', cont = new Map();
+    for (const r of S.rows) if (r.tipo === tipo || (F.tipo === 'Transferência' && r.tipo === 'Transferência')) cont.set(r.categoria, (cont.get(r.categoria) || 0) + 1);
+    let cats = [...cont].sort((a, b) => b[1] - a[1]).map(x => x[0]);
+    if (F.categoria && !cats.includes(F.categoria)) cats.unshift(F.categoria);
+    $('c-strip').replaceChildren(...cats.map(c => {
+      const b = el('button', 'c-cat' + (F.categoria === c ? ' on' : '')); b.type = 'button'; b.setAttribute('aria-label', c); b.setAttribute('aria-pressed', F.categoria === c);
+      const t = el('span', 'c-tile', abrev(c)); t.style.background = gcol(grupoDe(c, '', F.tipo));
+      b.append(t, el('span', 'c-nome', c)); b.onclick = () => { F.categoria = c; fDesenha(); };
+      return b;
+    }));
+  }
+  function abrirCalc() { $('calc').hidden = false; $('sh-form').classList.add('com-calc'); calcFaixa(); const sel = $('c-strip').querySelector('.on'); if (sel && sel.scrollIntoView) sel.scrollIntoView({ inline: 'center', block: 'nearest' }); }
+  function fecharCalc() { $('calc').hidden = true; $('sh-form').classList.remove('com-calc'); }
+  $('f-valor-btn').addEventListener('click', e => { e.stopPropagation(); C = F.valor && F.valor !== '0' ? F.valor : ''; abrirCalc(); fDesenha(); });
+  $('sh-form').querySelector('.sheet').addEventListener('click', e => { if (!$('calc').hidden && !e.target.closest('#calc, #f-valor-btn, #f-tipo, #f-ok')) fecharCalc(); });
 
   $('f-ok').addEventListener('click', () => {
+    if (!$('calc').hidden && C) F.valor = String(calcAvalia(C)).replace('.', ',');
     const v = F.valor ? parseFloat(F.valor.replace(',', '.')) : 0; const data = $('f-data').value;
     const erro = !(v > 0) ? 'Toca em Montante e escreve o valor.' : !/^\d{4}-\d{2}-\d{2}$/.test(data) ? 'Escolhe a data.' : !F.conta ? 'Escolhe a conta.' : !F.categoria ? 'Escolhe a categoria.' : '';
     if (erro) { $('f-msg').textContent = erro; return; }
@@ -709,45 +760,8 @@
     fechar('sh-form'); saveManuais('Movimento apagado');
   });
 
-  // 2. Teclado rápido
-  const Q = { s: '', sinal: -1, cat: '', conta: '' };
-  function qDesenha() {
-    const v = Q.s ? parseFloat(Q.s.replace(',', '.')) : 0;
-    $('q-val').textContent = (Q.sinal < 0 ? '−' : '+') + ' ' + (Q.s ? Q.s.replace(/^(\d+)/, d => L.format(',')(+d)) : '0') + ' €';
-    $('q-sign').textContent = Q.sinal < 0 ? 'Despesa' : 'Receita';
-    $('q-sign').classList.toggle('pos', Q.sinal > 0);
-    const desde = new Date(); desde.setDate(desde.getDate() - 120); const lim = desde.toISOString().slice(0, 10);
-    const cont = new Map();
-    for (const r of S.rows) if (r.tipo === (Q.sinal < 0 ? 'Despesa' : 'Receita') && r.data >= lim) cont.set(r.categoria, (cont.get(r.categoria) || 0) + 1);
-    let top = [...cont].sort((a, b) => b[1] - a[1]).slice(0, 8).map(x => x[0]);
-    if (Q.cat && !top.includes(Q.cat)) top = [Q.cat].concat(top.slice(0, 7));
-    const chip = (txt, on, fn) => { const b = el('button', 'qchip' + (on ? ' on' : ''), txt); b.type = 'button'; b.onclick = fn; return b; };
-    $('q-cats').replaceChildren(...top.map(c => chip(c, Q.cat === c, () => { Q.cat = c; qDesenha(); })), chip('Outra…', false, () => qMais()));
-    $('q-contas').replaceChildren(...listaContas().map(c => chip(c, Q.conta === c, () => { Q.conta = c; qDesenha(); })));
-    $('q-ok').classList.toggle('dim', !(v > 0 && Q.cat && Q.conta));
-  }
-  function abrirRapido() {
-    Q.s = ''; Q.sinal = -1; Q.cat = ''; Q.conta = listaContas()[0] || '';
-    qDesenha(); abrir('sh-quick');
-  }
-  function qMais() {
-    const v = Q.s ? parseFloat(Q.s.replace(',', '.')) : 0;
-    abrirForm({ tipo: Q.sinal < 0 ? 'Despesa' : 'Receita', montante: v, conta: Q.conta, categoria: Q.cat, etiquetas: '' }, true);
-  }
-  const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'];
-  teclado($('q-kp'), () => Q.s, v => { Q.s = v; }, qDesenha);
-  teclado($('k-kp'), () => K, v => { K = v; }, kDesenha);
-  $('q-sign').addEventListener('click', () => { Q.sinal = -Q.sinal; Q.cat = ''; qDesenha(); });
-  $('q-mais').addEventListener('click', qMais);
-  $('q-ok').addEventListener('click', () => {
-    const v = Q.s ? parseFloat(Q.s.replace(',', '.')) : 0;
-    if (!(v > 0)) { toast('Escreve o valor.', true); return; }
-    if (!Q.cat) { toast('Escolhe a categoria.', true); return; }
-    if (!Q.conta) { toast('Escolhe a conta.', true); return; }
-    adicionar({ data: hoje(), tipo: Q.sinal < 0 ? 'Despesa' : 'Receita', montante: Q.sinal * v, conta: Q.conta, categoria: Q.cat, etiquetas: '' });
-    fechar('sh-quick'); saveManuais('Movimento adicionado');
-  });
-  $('fab').addEventListener('click', abrirRapido);
+  // 2. Botão + abre o formulário já com o teclado
+  $('fab').addEventListener('click', () => { abrirForm(null); C = ''; abrirCalc(); fDesenha(); });
 
   // 5. Editor de grupos
   const NOMES_G = Object.keys(GRUPOS).filter(g => g !== 'Rendimentos' && g !== 'Dinheiro').concat(['Rendimentos', 'Dinheiro', 'Outros']);
