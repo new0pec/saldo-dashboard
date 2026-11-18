@@ -185,6 +185,41 @@ button,input,select{font:inherit;color:inherit}
 .toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;max-width:calc(100% - 32px);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#fff;background:rgba(30,30,32,.92);box-shadow:0 8px 24px rgba(0,0,0,.25);text-align:center}
 .toast.erro{background:rgba(180,40,40,.95);border-radius:16px}
 .card-head .link{font-size:14px}
+.mf{max-width:480px;padding:16px 14px 22px;background:color-mix(in srgb,var(--panel) 92%,transparent)}
+.mf-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px;gap:8px}
+.mf-top b{font-size:16px;flex:1;text-align:center}
+.mf-x{width:38px;height:38px;border-radius:50%;border:0;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--fg) 10%,transparent);cursor:pointer}
+.mf-save{border:0;border-radius:999px;padding:9px 16px;font-size:15px;font-weight:600;color:#0A84FF;background:color-mix(in srgb,var(--fg) 10%,transparent);cursor:pointer}
+.mf-tipos{display:flex;justify-content:center;gap:10px;margin:0 0 14px}
+.mf-tipos button{--tipo-bg:#3a3a3c;width:44px;height:32px;border-radius:9px;border:0;background:var(--tipo-bg);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+@media (prefers-color-scheme:light){.mf-tipos button{--tipo-bg:#d1d1d6;color:#1c1c1e}}
+.mf-tipos button svg{width:20px;height:20px}
+.mf-tipos button.on{--tipo-bg:#FF453A;color:#fff}
+.mf-tipos button.on[data-v=Receita]{--tipo-bg:#30D158}
+.mf-tipos button.on[data-v="Transferência"]{--tipo-bg:#0A84FF}
+.mf-card{display:block;width:100%;border:0;text-align:left;border-radius:18px;background:color-mix(in srgb,var(--fg) 7%,transparent);margin:0 0 12px;padding:0 12px;overflow:hidden}
+.mf-amt{display:flex;align-items:center;gap:12px;padding:12px;cursor:pointer}
+.mf-amt-ico{width:46px;height:46px;border-radius:12px;border:2px dashed var(--muted);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;flex:0 0 auto}
+.mf-amt-ico.cheio{border:0}
+.mf-amt-txt{flex:1;display:flex;flex-direction:column}
+.mf-amt-txt small{font-size:12px;color:var(--muted)}
+.mf-amt-txt strong{font-size:32px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.1}
+.mf-cur{font-size:13px;font-weight:600;padding:6px 10px;border-radius:9px;background:color-mix(in srgb,var(--fg) 10%,transparent)}
+.mf-row{display:flex;align-items:center;gap:12px;width:100%;min-height:50px;border:0;background:transparent;border-bottom:1px solid var(--line);padding:8px 0;text-align:left;cursor:pointer;margin:0!important;font-size:16px!important;color:var(--fg)!important}
+.mf-row:last-child{border-bottom:0}
+.mf-ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.mf-ico svg{width:17px;height:17px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mf-lab{font-size:16px;font-weight:500;flex:0 0 auto}
+.mf-val{margin-left:auto;color:var(--muted);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%;text-align:right}
+.mf-chev{color:var(--muted);font-size:20px;line-height:1;margin-left:2px}
+.mf-pills{margin-left:auto;display:flex;gap:6px}
+.mf-pill{border:0;border-radius:8px;padding:6px 8px;font-size:14px;background:color-mix(in srgb,var(--fg) 10%,transparent);color:var(--fg);min-width:0}
+.mf-in{flex:1;border:0;background:transparent;font-size:16px;outline:none;min-width:0;padding:4px 0}
+.mf-in::placeholder{color:var(--muted)}
+.mf-del{display:block;width:100%;border:0;border-radius:14px;padding:13px;font-size:16px;font-weight:600;color:#FF453A;background:color-mix(in srgb,#FF453A 12%,transparent);cursor:pointer}
+.plist{max-height:55vh;overflow:auto;padding:0 12px}
+.plist .mf-row .mf-ico{color:#fff;font-weight:700;font-size:13px}
+.p-check{margin-left:auto;color:#0A84FF;font-weight:700}
 [hidden]{display:none!important}
 @media (max-width:520px){.title{font-size:34px}.hero-num{font-size:38px}.ring{width:124px;height:124px}}
 @media (prefers-reduced-motion:no-preference){.card,.tile{animation:in .5s cubic-bezier(.2,.8,.2,1) both}@keyframes in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}}
@@ -304,20 +339,56 @@ button,input,select{font:inherit;color:inherit}
 </div>
 
 <div class="sheet-wrap" id="sh-form" hidden>
-  <div class="sheet glass" role="dialog" aria-modal="true" aria-labelledby="f-title">
-    <div class="sheet-top"><button type="button" class="link" data-close>Cancelar</button><b id="f-title">Novo movimento</b><span></span></div>
-    <div class="seg" id="f-tipo" role="group" aria-label="Tipo"><button type="button" data-v="Despesa" class="on">Despesa</button><button type="button" data-v="Receita">Receita</button><button type="button" data-v="Transferência">Transferência</button></div>
-    <div class="frm">
-      <label>Valor<input id="f-valor" inputmode="decimal" autocomplete="off" placeholder="0,00 €"></label>
-      <label>Data<input id="f-data" type="date"></label>
-      <label>Conta<select id="f-conta"></select></label>
-      <label id="f-nova-wrap" hidden>Conta nova<input id="f-nova" autocomplete="off" placeholder="Dinheiro"></label>
-      <label>Categoria<input id="f-cat" list="dl-cats" autocomplete="off" placeholder="Continente"></label>
-      <label>Etiquetas<input id="f-etq" autocomplete="off" placeholder="Alimentos"></label>
+  <div class="sheet glass mf" role="dialog" aria-modal="true" aria-labelledby="f-title">
+    <div class="mf-top"><button type="button" class="mf-x" data-close aria-label="Fechar"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button><b id="f-title">Despesa</b><button type="button" class="mf-save" id="f-ok">Salvar</button></div>
+    <div class="mf-tipos" id="f-tipo" role="group" aria-label="Tipo">
+      <button type="button" data-v="Receita" aria-label="Receita"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M12 8v8M8 12h8" stroke="var(--tipo-bg)" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+      <button type="button" data-v="Despesa" aria-label="Despesa" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M8 12h8" stroke="var(--tipo-bg)" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+      <button type="button" data-v="Transferência" aria-label="Transferência"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M9.5 7.5v9M9.5 7.5L7.5 9.5M9.5 7.5l2 2M14.5 16.5v-9M14.5 16.5l-2-2M14.5 16.5l2-2" stroke="var(--tipo-bg)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></button>
     </div>
+
+    <button type="button" class="mf-card mf-amt" id="f-valor-btn">
+      <span class="mf-amt-ico" id="f-cat-ico"></span>
+      <span class="mf-amt-txt"><small>Montante</small><strong id="f-valor">0,00</strong></span>
+      <span class="mf-cur">EUR</span>
+    </button>
+
+    <div class="mf-card"><button type="button" class="mf-row" id="f-conta-btn"><span class="mf-ico" style="background:#30B0C7"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18M12 3l9 5H3z"/></svg></span><span class="mf-lab">Conta</span><span class="mf-val" id="f-conta">—</span><span class="mf-chev">›</span></button></div>
+
+    <div class="mf-card">
+      <div class="mf-row"><span class="mf-ico" style="background:#FF453A"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/></svg></span><span class="mf-lab">Data</span><span class="mf-pills"><input type="date" id="f-data" class="mf-pill" aria-label="Data"><input type="time" id="f-hora" class="mf-pill" aria-label="Hora"></span></div>
+      <button type="button" class="mf-row" id="f-rep-btn"><span class="mf-ico" style="background:#BF5AF2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 014-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 01-4 4H4"/></svg></span><span class="mf-lab">Repetir</span><span class="mf-val" id="f-rep">Nunca</span><span class="mf-chev">›</span></button>
+    </div>
+
+    <div class="mf-card">
+      <button type="button" class="mf-row" id="f-cat-btn"><span class="mf-ico" style="background:#0A84FF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></span><span class="mf-lab">Categoria</span><span class="mf-val" id="f-cat">Sem</span><span class="mf-chev">›</span></button>
+      <button type="button" class="mf-row" id="f-etq-btn"><span class="mf-ico" style="background:#0A84FF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8zM7.5 7.5h.01"/></svg></span><span class="mf-lab">Hashtags</span><span class="mf-val" id="f-etq">Sem</span><span class="mf-chev">›</span></button>
+    </div>
+
+    <div class="mf-card">
+      <label class="mf-row"><span class="mf-ico" style="background:#FF9F0A"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></span><input class="mf-in" id="f-titulo" placeholder="Título" autocomplete="off"></label>
+      <label class="mf-row"><span class="mf-ico" style="background:#FF9F0A"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0"/></svg></span><input class="mf-in" id="f-receb" placeholder="Recebedor" autocomplete="off"></label>
+      <label class="mf-row"><span class="mf-ico" style="background:#FF9F0A"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5M8 3h8l-1 6 3 3H6l3-3z"/></svg></span><input class="mf-in" id="f-uso" placeholder="Uso" autocomplete="off"></label>
+    </div>
+
     <p class="msg" id="f-msg" role="alert"></p>
-    <button type="button" class="btn big" id="f-ok">Guardar</button>
-    <button type="button" class="btn sec big" id="f-del" hidden>Apagar movimento</button>
+    <button type="button" class="mf-del" id="f-del" hidden>Apagar movimento</button>
+  </div>
+</div>
+
+<div class="sheet-wrap" id="sh-pick" hidden>
+  <div class="sheet glass mf" role="dialog" aria-modal="true" aria-labelledby="p-title">
+    <div class="mf-top"><button type="button" class="link" id="p-back">Voltar</button><b id="p-title"></b><button type="button" class="mf-save" id="p-ok" hidden>OK</button></div>
+    <input class="search" id="p-q" type="search" placeholder="Procurar ou criar" autocomplete="off">
+    <div class="mf-card plist" id="p-list"></div>
+  </div>
+</div>
+
+<div class="sheet-wrap" id="sh-kp" hidden>
+  <div class="sheet glass mf" role="dialog" aria-modal="true" aria-label="Montante">
+    <div class="mf-top"><button type="button" class="link" data-close>Cancelar</button><b>Montante</b><button type="button" class="mf-save" id="k-ok">OK</button></div>
+    <div class="q-amt"><span id="k-val">0,00 €</span></div>
+    <div class="kp" id="k-kp"></div>
   </div>
 </div>
 

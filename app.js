@@ -200,11 +200,25 @@
     if (/teclado|ipad|port[aá]til|monitor/i.test(etq || '')) return 'Tecnologia';
     return grupoBase(cat);
   }
+  function isoDia(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function ocorrencias(m) {
+    if (!m.repetir || m.repetir === 'nunca') return [m.data];
+    const fim = isoDia(new Date()), out = [], [y, mo, dia] = m.data.split('-').map(Number);
+    for (let k = 0; k < 600; k++) {
+      let d;
+      if (m.repetir === 'semanal') d = new Date(y, mo - 1, dia + 7 * k, 12);
+      else if (m.repetir === 'mensal') { const ult = new Date(y, mo - 1 + k + 1, 0).getDate(); d = new Date(y, mo - 1 + k, Math.min(dia, ult), 12); }
+      else if (m.repetir === 'anual') { const ult = new Date(y + k, mo, 0).getDate(); d = new Date(y + k, mo - 1, Math.min(dia, ult), 12); }
+      else return [m.data];
+      const s = isoDia(d); if (s > fim) break; out.push(s);
+    }
+    return out.length ? out : [m.data];
+  }
   function compose() {
     const base = (S.base || []).map(r => r.tipo === 'Transferência' || !M.grupos[r.categoria] ? r : { ...r, grupo: M.grupos[r.categoria] });
-    const man = M.movimentos.filter(m => m && /^\d{4}-\d{2}-\d{2}$/.test(m.data)).map(m => ({
-      id: m.id, data: m.data, mes: m.data.slice(0, 7), montante: +m.montante, conta: m.conta, categoria: m.categoria, etiquetas: m.etiquetas || '',
-      tipo: m.tipo, grupo: grupoDe(m.categoria, m.etiquetas, m.tipo), manual: true }));
+    const man = M.movimentos.filter(m => m && /^\d{4}-\d{2}-\d{2}$/.test(m.data)).flatMap(m => ocorrencias(m).map((data, k) => ({
+      id: m.id, data, mes: data.slice(0, 7), montante: +m.montante, conta: m.conta, categoria: m.categoria, etiquetas: m.etiquetas || '',
+      tipo: m.tipo, grupo: grupoDe(m.categoria, m.etiquetas, m.tipo), manual: true, serie: !!m.repetir && m.repetir !== 'nunca' })));
     S.rows = base.concat(man);
   }
   async function loadManuais() {
@@ -437,7 +451,7 @@
     for (const r of rows.slice(0, N)) {
       if (r.data !== last) { out.push(el('li', 'txhead', fmtD(r.data))); last = r.data; }
       const li = el('li', 'tx-wrap'), row = el('div', 'tx'), mid = el('div'); mid.style.minWidth = '0';
-      mid.append(el('div', 'tx-t', r.categoria), el('div', 'tx-s', [r.manual ? 'Manual' : '', r.grupo, r.etiquetas, r.conta].filter(Boolean).join(' · ')));
+      mid.append(el('div', 'tx-t', r.categoria), el('div', 'tx-s', [r.manual ? (r.serie ? 'Manual · repete' : 'Manual') : '', r.grupo, r.etiquetas, r.conta].filter(Boolean).join(' · ')));
       const ti = el('div', 'tx-ico', ico(r.categoria)); ti.style.background = gcol(r.grupo);
       row.append(ti, mid, el('div', 'tx-v' + (r.tipo === 'Transferência' ? ' mov' : r.montante > 0 ? ' pos' : ''), (r.montante > 0 ? '+' : '') + eur(r.montante)));
       const act = el('div', 'tx-act');
@@ -573,41 +587,124 @@
     });
   }
 
-  // 1. Formulário completo
-  let fEdit = null, fTipo = 'Despesa';
-  function setTipo(t) { fTipo = t; $('f-tipo').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === t)); }
-  $('f-tipo').querySelectorAll('button').forEach(b => b.addEventListener('click', () => setTipo(b.dataset.v)));
+  // 1. Formulário completo (estilo MoneyStats)
+  const REP = { nunca: 'Nunca', semanal: 'Todas as semanas', mensal: 'Todos os meses', anual: 'Todos os anos' };
+  const F = {};
+  let fEdit = null;
+  const fmtMontante = s => (s ? s.replace(/^(\d+)/, d => L.format(',')(+d)) : '0') + (s && s.includes(',') ? '' : ',00');
+  function fDesenha() {
+    $('f-title').textContent = F.tipo;
+    $('f-tipo').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === F.tipo));
+    $('f-valor').textContent = L.format(',.2f')(F.valor ? parseFloat(F.valor.replace(',', '.')) || 0 : 0);
+    $('f-conta').textContent = F.conta || 'Escolher';
+    $('f-cat').textContent = F.categoria || 'Sem';
+    $('f-etq').textContent = F.etiquetas || 'Sem';
+    $('f-rep').textContent = REP[F.repetir || 'nunca'];
+    const ic = $('f-cat-ico');
+    if (F.categoria) { ic.textContent = ico(F.categoria); ic.style.background = gcol(grupoDe(F.categoria, F.etiquetas, F.tipo)); ic.classList.add('cheio'); }
+    else { ic.textContent = ''; ic.style.background = ''; ic.classList.remove('cheio'); }
+  }
+  $('f-tipo').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { F.tipo = b.dataset.v; fDesenha(); }));
   function abrirForm(r, comoNovo) {
     fecharLinhas();
     fEdit = r && r.manual && !comoNovo ? r.id : null;
-    $('f-title').textContent = fEdit ? 'Editar movimento' : (r ? 'Novo movimento (cópia)' : 'Novo movimento');
-    setTipo(r ? r.tipo : 'Despesa');
-    $('f-valor').value = r && r.montante ? fmtValor(Math.abs(r.montante)) : '';
-    $('f-data').value = r && fEdit ? r.data : hoje();
-    const contasL = listaContas();
-    $('f-conta').replaceChildren(...contasL.map(c => new Option(c, c)), new Option('Nova conta…', '__nova__'));
-    $('f-conta').value = r && r.conta ? r.conta : (contasL[0] || '__nova__');
-    $('f-nova-wrap').hidden = $('f-conta').value !== '__nova__'; $('f-nova').value = '';
-    $('dl-cats').replaceChildren(...listaCats().map(c => new Option(c)));
-    $('f-cat').value = r ? r.categoria : '';
-    $('f-etq').value = r ? (r.etiquetas || '') : '';
+    const base = fEdit ? (M.movimentos.find(m => m.id === fEdit) || r) : r;
+    Object.assign(F, {
+      tipo: base ? base.tipo : 'Despesa',
+      valor: base && base.montante ? String(Math.abs(+base.montante).toFixed(2)).replace('.', ',').replace(/,00$/, '') : '',
+      conta: base && base.conta ? base.conta : (listaContas()[0] || ''),
+      categoria: base ? base.categoria || '' : '', etiquetas: base ? base.etiquetas || '' : '',
+      repetir: fEdit && base.repetir ? base.repetir : 'nunca'
+    });
+    const agora = new Date();
+    $('f-data').value = fEdit ? base.data : hoje();
+    $('f-hora').value = fEdit && base.hora ? base.hora : String(agora.getHours()).padStart(2, '0') + ':' + String(agora.getMinutes()).padStart(2, '0');
+    $('f-titulo').value = fEdit ? base.titulo || '' : ''; $('f-receb').value = fEdit ? base.recebedor || '' : ''; $('f-uso').value = fEdit ? base.uso || '' : '';
     $('f-del').hidden = !fEdit; $('f-msg').textContent = '';
+    fDesenha();
     fechar('sh-quick'); abrir('sh-form');
   }
-  $('f-conta').addEventListener('change', () => { $('f-nova-wrap').hidden = $('f-conta').value !== '__nova__'; if (!$('f-nova-wrap').hidden) $('f-nova').focus(); });
+
+  // Lista de escolha (conta, categoria, hashtags, repetir)
+  let P = null;
+  function pick(cfg) {
+    P = { ...cfg, sel: new Set(cfg.multi ? cfg.atual : [cfg.atual]) };
+    $('p-title').textContent = cfg.titulo; $('p-q').value = ''; $('p-q').hidden = cfg.semPesquisa; $('p-ok').hidden = !cfg.multi;
+    pDesenha(); abrir('sh-pick');
+    if (!cfg.semPesquisa && window.matchMedia('(pointer:fine)').matches) $('p-q').focus();
+  }
+  function pDesenha() {
+    const q = $('p-q').value.trim(), ql = q.toLowerCase();
+    let ops = P.opcoes.filter(o => !ql || o.label.toLowerCase().includes(ql));
+    const linhas = ops.map(o => {
+      const b = el('button', 'mf-row'); b.type = 'button';
+      const i = el('span', 'mf-ico', o.ini || ico(o.label)); i.style.background = o.cor || '#8E8E93';
+      b.append(i, el('span', 'mf-lab', o.label));
+      if (P.sel.has(o.v)) b.append(el('span', 'p-check', '✓'));
+      b.onclick = () => escolhe(o.v);
+      return b;
+    });
+    if (P.criar && q && !P.opcoes.some(o => o.label.toLowerCase() === ql)) {
+      const b = el('button', 'mf-row'); b.type = 'button';
+      const i = el('span', 'mf-ico', '+'); i.style.background = '#0A84FF';
+      b.append(i, el('span', 'mf-lab', 'Criar «' + q + '»')); b.onclick = () => escolhe(q, true);
+      linhas.unshift(b);
+    }
+    if (!linhas.length) linhas.push(el('p', 'empty', 'Sem resultados.'));
+    $('p-list').replaceChildren(...linhas);
+  }
+  function escolhe(v, nova) {
+    if (P.multi) {
+      if (nova) P.opcoes.unshift({ v, label: v });
+      P.sel.has(v) ? P.sel.delete(v) : P.sel.add(v); $('p-q').value = ''; pDesenha(); return;
+    }
+    fechar('sh-pick'); P.fim(v, nova); fDesenha();
+  }
+  $('p-q').addEventListener('input', pDesenha);
+  $('p-back').addEventListener('click', () => { if (P && P.multi) P.fim([...P.sel]); fechar('sh-pick'); fDesenha(); });
+  $('p-ok').addEventListener('click', () => { P.fim([...P.sel]); fechar('sh-pick'); fDesenha(); });
+
+  $('f-conta-btn').addEventListener('click', () => pick({ titulo: 'Conta', atual: F.conta, criar: true,
+    opcoes: listaContas().map((c, i) => ({ v: c, label: c, cor: COLORS[i % COLORS.length] })),
+    fim: (v, nova) => { F.conta = v; if (nova && !M.contas.includes(v)) M.contas.push(v); } }));
+  $('f-cat-btn').addEventListener('click', () => pick({ titulo: 'Categoria', atual: F.categoria, criar: true,
+    opcoes: listaCats().map(c => ({ v: c, label: c, cor: gcol(grupoDe(c, '', F.tipo === 'Transferência' ? 'Despesa' : F.tipo)) })),
+    fim: v => { F.categoria = v; } }));
+  $('f-etq-btn').addEventListener('click', () => {
+    const todas = [...new Set(S.rows.flatMap(r => String(r.etiquetas || '').split(',').map(x => x.trim()).filter(Boolean)))].sort((a, b) => a.localeCompare(b, 'pt'));
+    pick({ titulo: 'Hashtags', multi: true, criar: true, atual: String(F.etiquetas || '').split(',').map(x => x.trim()).filter(Boolean),
+      opcoes: todas.map(t => ({ v: t, label: t, ini: '#', cor: '#0A84FF' })), fim: arr => { F.etiquetas = arr.join(', '); } });
+  });
+  $('f-rep-btn').addEventListener('click', () => pick({ titulo: 'Repetir', atual: F.repetir || 'nunca', semPesquisa: true,
+    opcoes: Object.entries(REP).map(([v, label]) => ({ v, label, ini: '↻', cor: '#BF5AF2' })), fim: v => { F.repetir = v; } }));
+
+  // Teclado do montante
+  let K = '';
+  const kDesenha = () => { $('k-val').textContent = fmtMontante(K) + ' €'; };
+  function teclado(contentor, obter, definir, depois) {
+    contentor.replaceChildren(...KEYS.map(k => { const b = el('button', 'key', k); b.type = 'button'; if (k === '⌫') b.setAttribute('aria-label', 'Apagar'); b.onclick = () => {
+      let s = obter();
+      if (k === '⌫') s = s.slice(0, -1);
+      else if (k === ',') { if (!s.includes(',')) s = (s || '0') + ','; }
+      else { const dec = s.split(',')[1]; if (dec != null && dec.length >= 2) return; if (s.replace(',', '').length >= 8) return; s = (s === '0' ? '' : s) + k; }
+      definir(s); depois(); }; return b; }));
+  }
+  $('f-valor-btn').addEventListener('click', () => { K = F.valor || ''; kDesenha(); abrir('sh-kp'); });
+  $('k-ok').addEventListener('click', () => { F.valor = K; fechar('sh-kp'); fDesenha(); });
+
   $('f-ok').addEventListener('click', () => {
-    const v = parseFloat($('f-valor').value.replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
-    let conta = $('f-conta').value; const cat = $('f-cat').value.trim(); const data = $('f-data').value;
-    if (conta === '__nova__') { conta = $('f-nova').value.trim(); if (conta && !M.contas.includes(conta)) M.contas.push(conta); }
-    const erro = !(v > 0) ? 'Escreve um valor maior que zero.' : !/^\d{4}-\d{2}-\d{2}$/.test(data) ? 'Escolhe a data.' : !conta ? 'Escolhe ou escreve a conta.' : !cat ? 'Escreve a categoria.' : '';
+    const v = F.valor ? parseFloat(F.valor.replace(',', '.')) : 0; const data = $('f-data').value;
+    const erro = !(v > 0) ? 'Toca em Montante e escreve o valor.' : !/^\d{4}-\d{2}-\d{2}$/.test(data) ? 'Escolhe a data.' : !F.conta ? 'Escolhe a conta.' : !F.categoria ? 'Escolhe a categoria.' : '';
     if (erro) { $('f-msg').textContent = erro; return; }
-    const mov = { data, tipo: fTipo, montante: fTipo === 'Receita' ? v : -v, conta, categoria: cat, etiquetas: $('f-etq').value.trim() };
-    if (fEdit) { const i = M.movimentos.findIndex(m => m.id === fEdit); if (i >= 0) M.movimentos[i] = { ...M.movimentos[i], ...mov }; }
+    const mov = { data, hora: $('f-hora').value || '', tipo: F.tipo, montante: F.tipo === 'Receita' ? v : -v, conta: F.conta, categoria: F.categoria, etiquetas: F.etiquetas || '',
+      repetir: F.repetir && F.repetir !== 'nunca' ? F.repetir : undefined, titulo: $('f-titulo').value.trim() || undefined, recebedor: $('f-receb').value.trim() || undefined, uso: $('f-uso').value.trim() || undefined };
+    Object.keys(mov).forEach(k => mov[k] === undefined && delete mov[k]);
+    if (fEdit) { const i = M.movimentos.findIndex(m => m.id === fEdit); if (i >= 0) M.movimentos[i] = { id: fEdit, ...mov }; }
     else adicionar(mov);
     fechar('sh-form'); saveManuais(fEdit ? 'Movimento atualizado' : 'Movimento adicionado');
   });
   $('f-del').addEventListener('click', () => {
-    if (!fEdit || !window.confirm('Apagar este movimento?')) return;
+    if (!fEdit || !window.confirm('Apagar este movimento' + (F.repetir && F.repetir !== 'nunca' ? ' e todas as repetições?' : '?'))) return;
     M.movimentos = M.movimentos.filter(m => m.id !== fEdit);
     fechar('sh-form'); saveManuais('Movimento apagado');
   });
@@ -636,14 +733,10 @@
   function qMais() {
     const v = Q.s ? parseFloat(Q.s.replace(',', '.')) : 0;
     abrirForm({ tipo: Q.sinal < 0 ? 'Despesa' : 'Receita', montante: v, conta: Q.conta, categoria: Q.cat, etiquetas: '' }, true);
-    $('f-title').textContent = 'Novo movimento';
   }
   const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'];
-  $('q-kp').replaceChildren(...KEYS.map(k => { const b = el('button', 'key', k); b.type = 'button'; if (k === '⌫') b.setAttribute('aria-label', 'Apagar'); b.onclick = () => {
-    if (k === '⌫') Q.s = Q.s.slice(0, -1);
-    else if (k === ',') { if (!Q.s.includes(',')) Q.s = (Q.s || '0') + ','; }
-    else { const dec = Q.s.split(',')[1]; if (dec != null && dec.length >= 2) return; if (Q.s.replace(',', '').length >= 8) return; Q.s = (Q.s === '0' ? '' : Q.s) + k; }
-    qDesenha(); }; return b; }));
+  teclado($('q-kp'), () => Q.s, v => { Q.s = v; }, qDesenha);
+  teclado($('k-kp'), () => K, v => { K = v; }, kDesenha);
   $('q-sign').addEventListener('click', () => { Q.sinal = -Q.sinal; Q.cat = ''; qDesenha(); });
   $('q-mais').addEventListener('click', qMais);
   $('q-ok').addEventListener('click', () => {
