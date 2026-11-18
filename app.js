@@ -88,7 +88,8 @@
   const CFG = { key: 'saldo.appKey', folder: 'saldo.folder', tok: 'saldo.tokens', ver: 'saldo.pkce', cache: 'saldo.cache' };
   const redirectUri = () => location.origin + location.pathname;
   const appKey = () => (store.get(CFG.key) || '').trim();
-  const folder = () => { let f = (store.get(CFG.folder) || '/Claudee').trim(); if (!f.startsWith('/')) f = '/' + f; return f.replace(/\/+$/, ''); };
+  if ((store.get(CFG.folder) || '').trim().toLowerCase() === '/claudee') store.set(CFG.folder, '/MyNewClaudee');
+  const folder = () => { let f = (store.get(CFG.folder) || '/MyNewClaudee').trim(); if (!f.startsWith('/')) f = '/' + f; return f.replace(/\/+$/, ''); };
   const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
   async function connect() {
@@ -427,7 +428,7 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
   $('cfg-connect').onclick = async () => {
     store.set(CFG.key, $('cfg-key').value.trim());
-    store.set(CFG.folder, $('cfg-folder').value.trim() || '/Claudee');
+    store.set(CFG.folder, $('cfg-folder').value.trim() || '/MyNewClaudee');
     try { await connect(); } catch (e) { $('cfg-msg').textContent = e.message; }
   };
   $('cfg-logout').onclick = () => { store.del(CFG.tok); store.del(CFG.cache); S.rows = []; S.meta = null; showSource(null); render(); $('cfg-msg').textContent = 'Desligado. Os dados guardados neste dispositivo foram apagados.'; };
