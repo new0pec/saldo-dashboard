@@ -407,14 +407,28 @@
     render();
   }
 
-  async function refresh() {
+  let busy = false, lastRefresh = 0;
+  async function refresh(auto) {
     const btn = $('refresh');
-    if (!appKey() || !store.get(CFG.tok)) { openSheet(); return; }
+    if (!appKey() || !store.get(CFG.tok)) { if (!auto) openSheet(); return; }
+    if (busy) return;
+    busy = true; lastRefresh = Date.now();
     btn.classList.add('busy'); btn.setAttribute('aria-busy', 'true');
-    try { useData(await latestFromDropbox(), true); }
+    try {
+      const res = await latestFromDropbox();
+      const mudou = !S.meta || S.meta.name !== res.name || S.meta.modified !== res.modified || S.rows.length === 0 || !auto;
+      if (mudou) useData(res, true); else showSource(S.meta);
+    }
     catch (e) { showSource(S.meta, e.message); if (!S.rows.length) render(); }
-    finally { btn.classList.remove('busy'); btn.removeAttribute('aria-busy'); }
+    finally { busy = false; btn.classList.remove('busy'); btn.removeAttribute('aria-busy'); }
   }
+
+  // Atualização automática de 2 em 2 minutos (só com a página visível) e ao voltar à página
+  const INTERVALO = 2 * 60 * 1000;
+  setInterval(() => { if (document.visibilityState === 'visible') refresh(true); }, INTERVALO);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && Date.now() - lastRefresh > INTERVALO) refresh(true);
+  });
 
   // ---------- Definições ----------
   function openSheet(msg) {
@@ -446,7 +460,7 @@
     catch (err) { openSheet(err.message); }
     e.target.value = '';
   };
-  $('refresh').onclick = refresh;
+  $('refresh').onclick = () => refresh(false);
   $('conta').onchange = e => set({ conta: e.target.value });
   $('ano').onchange = e => set({ ano: e.target.value, mes: '' });
   $('search').addEventListener('input', e => { S.q = e.target.value; drawList(); });
@@ -458,6 +472,6 @@
     const c = JSON.parse(store.get(CFG.cache) || 'null');
     if (c && c.text) { try { useData(c, false); } catch (e) { store.del(CFG.cache); } }
     render();
-    if (appKey() && store.get(CFG.tok)) refresh();
+    if (appKey() && store.get(CFG.tok)) refresh(true);
   })();
 })();
