@@ -224,6 +224,7 @@
   function render() {
     const has = S.rows.length > 0;
     $('app').hidden = !has; $('onboard').hidden = has;
+    $('lede').hidden = !has; $('ano').hidden = !has;
     if (!has) return;
     const ms = meses(), r = resumo(ms);
 
