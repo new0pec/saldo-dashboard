@@ -389,8 +389,8 @@
     f.classList.toggle('warn', !!warn);
     if (!meta) { f.textContent = warn || 'Sem dados'; return; }
     const d = new Date(meta.modified);
-    const quando = isNaN(d) ? '' : ' · exportado a ' + d.getDate() + ' ' + MES3[d.getMonth()] + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-    f.textContent = (warn ? warn + ' · ' : '') + meta.origem + ' · ' + meta.name + quando;
+    const quando = isNaN(d) ? '' : d.getDate() + ' ' + MES3[d.getMonth()] + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    f.textContent = warn ? warn : quando;
   }
 
   function useData(res, cache) {
