@@ -393,8 +393,9 @@
     f.classList.toggle('warn', !!warn);
     if (!meta) { f.textContent = warn || 'Sem dados'; return; }
     const d = new Date(meta.modified);
-    const quando = isNaN(d) ? '' : d.getDate() + ' ' + MES3[d.getMonth()] + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-    f.textContent = warn ? warn : quando;
+    const hm = x => String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0');
+    const quando = isNaN(d) ? '' : d.getDate() + ' ' + MES3[d.getMonth()] + ' ' + hm(d);
+    f.textContent = warn ? warn : quando + (S.checked ? ' · verificado ' + hm(S.checked) : '');
   }
 
   function useData(res, cache) {
@@ -416,6 +417,7 @@
     btn.classList.add('busy'); btn.setAttribute('aria-busy', 'true');
     try {
       const res = await latestFromDropbox();
+      S.checked = new Date();
       const mudou = !S.meta || S.meta.name !== res.name || S.meta.modified !== res.modified || S.rows.length === 0 || !auto;
       if (mudou) useData(res, true); else showSource(S.meta);
     }
