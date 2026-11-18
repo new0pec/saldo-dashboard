@@ -52,6 +52,7 @@ button,input,select{font:inherit;color:inherit}
 .chip:active{transform:scale(.95)}
 .chip.on{background:#FF9F0A;color:#fff;border-color:transparent;box-shadow:0 4px 14px rgba(255,159,10,.4)}
 .pill{border-radius:999px;font-weight:600;font-size:14px;min-height:38px;padding:0 14px;border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 70%,transparent)}
+.pill-sm{min-height:29px;font-size:12.5px;padding:0 11px}
 .card{border-radius:28px;padding:18px;margin-bottom:14px}
 .label{margin:0;font-size:13px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
@@ -155,7 +156,7 @@ button,input,select{font:inherit;color:inherit}
       </div>
     </div>
     <p class="lede" id="lede">—</p>
-    <div class="src-row"><p class="src" id="fonte">Sem dados</p></div>
+    <div class="src-row"><p class="src" id="fonte">Sem dados</p><select class="pill pill-sm" id="ano" aria-label="Ano"></select></div>
   </header>
 
   <section class="card onboard" id="onboard" hidden>
@@ -169,7 +170,6 @@ button,input,select{font:inherit;color:inherit}
 
   <div id="app" hidden>
     <div class="controls">
-      <select class="pill" id="ano" aria-label="Ano"></select>
       <div class="chips glass" id="chips" role="group" aria-label="Período"></div>
       <select class="pill" id="conta" aria-label="Conta"></select>
     </div>
