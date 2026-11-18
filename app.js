@@ -215,7 +215,9 @@
 
   function contas() {
     const m = d3.rollup(S.rows, v => d3.sum(v, r => r.montante), r => r.conta);
-    return [...m].map(([conta, saldo]) => ({ conta, saldo })).sort((a, b) => b.saldo - a.saldo);
+    const ORDEM = [/^activobank$/i, /^revolut/i, /^c\.?\s*c\.?\s*activobank|activobank\s*c\.?\s*c/i, /wizink/i, /^dinheiro/i, /alimenta/i];
+    const pos = c => { const i = ORDEM.findIndex(re => re.test(c)); return i < 0 ? 99 : i; };
+    return [...m].map(([conta, saldo]) => ({ conta, saldo })).sort((a, b) => pos(a.conta) - pos(b.conta) || a.conta.localeCompare(b.conta, 'pt'));
   }
 
   const set = patch => { Object.assign(S, patch); render(); };
@@ -243,8 +245,14 @@
     // Meses
     const mk = (lab, val) => { const b = el('button', 'chip' + (S.mes === val ? ' on' : ''), lab); b.type = 'button'; b.setAttribute('aria-pressed', S.mes === val); b.onclick = () => set({ mes: val }); return b; };
     const chips = $('chips');
-    const multi = new Set(ms.map(x => x.mes.slice(0, 4))).size > 1;
-    chips.replaceChildren(mk(S.ano ? 'Ano todo' : 'Tudo', ''), ...ms.map(x => mk(mesCurto(x.mes) + (multi ? ' ' + x.mes.slice(2, 4) : ''), x.mes)));
+    const anosSel = S.ano ? [S.ano] : [...new Set(S.rows.map(x => x.mes.slice(0, 4)))].sort();
+    const comDados = new Set(ms.map(x => x.mes)), multi = anosSel.length > 1, todos = [];
+    for (const y of anosSel) for (let i = 1; i <= 12; i++) todos.push(y + '-' + String(i).padStart(2, '0'));
+    chips.replaceChildren(mk(S.ano ? 'Ano todo' : 'Tudo', ''), ...todos.map(mes => {
+      const b = mk(mesCurto(mes) + (multi ? ' ' + mes.slice(2, 4) : ''), mes);
+      if (!comDados.has(mes) && S.mes !== mes) { b.disabled = true; b.classList.add('vazio'); b.title = 'Ainda sem dados'; }
+      return b;
+    }));
     const on = chips.querySelector('.on'); if (on && chips.scrollWidth > chips.clientWidth) chips.scrollLeft = on.offsetLeft - chips.clientWidth / 2 + on.offsetWidth / 2;
 
     // Contas (select)
