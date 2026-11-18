@@ -174,13 +174,14 @@
   }
 
   // ---------- Estado e cálculos ----------
-  const S = { rows: [], meta: null, mes: '', conta: '', grupo: '', categoria: '', q: '' };
+  const S = { rows: [], meta: null, ano: '', mes: '', conta: '', grupo: '', categoria: '', q: '' };
   let drawnBars = false;
 
   function meses() {
     const m = new Map();
     for (const r of S.rows) {
       if (S.conta && r.conta !== S.conta) continue;
+      if (S.ano && r.mes.slice(0, 4) !== S.ano) continue;
       if (r.tipo === 'Transferência') continue;
       const o = m.get(r.mes) || { mes: r.mes, receitas: 0, despesas: 0 };
       if (r.montante > 0) o.receitas += r.montante; else o.despesas -= r.montante;
@@ -201,7 +202,7 @@
   }
 
   function despesasFiltradas(comGrupo) {
-    return S.rows.filter(r => r.tipo === 'Despesa' && (!S.conta || r.conta === S.conta) && (!S.mes || r.mes === S.mes) && (!comGrupo || !S.grupo || r.grupo === S.grupo));
+    return S.rows.filter(r => r.tipo === 'Despesa' && (!S.conta || r.conta === S.conta) && (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano) && (!comGrupo || !S.grupo || r.grupo === S.grupo));
   }
 
   function agrupa(rows, key) {
@@ -226,11 +227,13 @@
     if (!has) return;
     const ms = meses(), r = resumo(ms);
 
-    $('periodo').textContent = S.mes ? mesLongo(S.mes) : (ms.length ? mesLongo(ms[0].mes).replace(/ \d+$/, '') + ' – ' + mesLongo(ms[ms.length - 1].mes) : '—');
+    const anos = [...new Set(S.rows.map(x => x.mes.slice(0, 4)))].sort().reverse(), selA = $('ano');
+    selA.replaceChildren(new Option('Todos os anos', ''), ...anos.map(a => new Option(a, a)));
+    selA.value = S.ano;
 
     // Frase de resumo
     if (r) {
-      const parts = [(S.mes ? 'Em ' + mesLongo(S.mes).replace(/ \d+$/, '') + ' ' : 'Desde ' + mesLongo(ms[0].mes).replace(/ \d+$/, '') + ' ') + 'entraram ', el('b', null, eur0(r.receitas)), ' e saíram ', el('b', null, eur0(r.despesas)), (S.conta ? ' na conta ' + S.conta : '') + '. '];
+      const parts = [(S.mes ? 'Em ' + mesLongo(S.mes) + ' ' : S.ano ? 'Em ' + S.ano + ' ' : 'Desde ' + mesLongo(ms[0].mes) + ' ') + 'entraram ', el('b', null, eur0(r.receitas)), ' e saíram ', el('b', null, eur0(r.despesas)), (S.conta ? ' na conta ' + S.conta : '') + '. '];
       if (r.liquido >= 0) parts.push('Sobraram ', el('b', null, eur0(r.liquido)), '.');
       else parts.push('Gastou mais ', el('b', null, eur0(-r.liquido)), ' do que recebeu.');
       $('lede').replaceChildren(...parts);
@@ -239,7 +242,8 @@
     // Meses
     const mk = (lab, val) => { const b = el('button', 'chip' + (S.mes === val ? ' on' : ''), lab); b.type = 'button'; b.setAttribute('aria-pressed', S.mes === val); b.onclick = () => set({ mes: val }); return b; };
     const chips = $('chips');
-    chips.replaceChildren(mk('Ano', ''), ...ms.map(x => mk(mesCurto(x.mes), x.mes)));
+    const multi = new Set(ms.map(x => x.mes.slice(0, 4))).size > 1;
+    chips.replaceChildren(mk(S.ano ? 'Ano todo' : 'Tudo', ''), ...ms.map(x => mk(mesCurto(x.mes) + (multi ? ' ' + x.mes.slice(2, 4) : ''), x.mes)));
     const on = chips.querySelector('.on'); if (on && chips.scrollWidth > chips.clientWidth) chips.scrollLeft = on.offsetLeft - chips.clientWidth / 2 + on.offsetWidth / 2;
 
     // Contas (select)
@@ -365,7 +369,7 @@
     if (S.categoria) { const b = el('button', 'filter', S.categoria + '  ×'); b.type = 'button'; b.onclick = () => set({ categoria: '' }); fc.replaceChildren(b); }
     else fc.replaceChildren();
     const q = S.q.trim().toLowerCase();
-    let rows = S.rows.filter(r => (!S.mes || r.mes === S.mes) && (!S.conta || r.conta === S.conta) && (!S.grupo || r.grupo === S.grupo) && (!S.categoria || r.categoria === S.categoria)
+    let rows = S.rows.filter(r => (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano) && (!S.conta || r.conta === S.conta) && (!S.grupo || r.grupo === S.grupo) && (!S.categoria || r.categoria === S.categoria)
       && (!q || (r.categoria + ' ' + r.etiquetas + ' ' + r.conta + ' ' + r.grupo).toLowerCase().includes(q)));
     rows = rows.slice().sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : 0);
     if (!rows.length) { $('lista').replaceChildren(el('li', 'empty', 'Nenhum movimento encontrado.')); return; }
@@ -397,6 +401,7 @@
     const rows = parseExport(res.text);
     S.rows = rows; S.meta = { name: res.name, modified: res.modified, origem: res.origem };
     if (S.mes && !rows.some(r => r.mes === S.mes)) S.mes = '';
+    if (S.ano && !rows.some(r => r.mes.startsWith(S.ano))) S.ano = '';
     if (cache) store.set(CFG.cache, JSON.stringify({ ...S.meta, text: res.text }));
     showSource(S.meta);
     render();
@@ -443,6 +448,7 @@
   };
   $('refresh').onclick = refresh;
   $('conta').onchange = e => set({ conta: e.target.value });
+  $('ano').onchange = e => set({ ano: e.target.value, mes: '' });
   $('search').addEventListener('input', e => { S.q = e.target.value; drawList(); });
   let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (S.rows.length) drawBars(meses()); }, 150); });
 

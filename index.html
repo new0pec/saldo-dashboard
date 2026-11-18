@@ -27,7 +27,9 @@ button,input,select{font:inherit;color:inherit}
 .ios-bg .o4{width:400px;height:400px;right:-60px;bottom:10%;background:radial-gradient(circle,#D63384,transparent 65%);opacity:.36}
 @media (prefers-reduced-motion:no-preference){.ios-bg .orb{animation:drift 22s ease-in-out infinite alternate}.ios-bg .o2{animation-duration:27s}.ios-bg .o3{animation-duration:31s}@keyframes drift{to{transform:translate(40px,30px) scale(1.08)}}}
 .glass,.card,.chip,.tile{background:color-mix(in srgb,var(--panel) 58%,transparent);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 8px 28px rgba(0,0,0,.07)}
-.head{padding:18px 4px 10px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.head{padding:18px 4px 10px}
+.head-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.head-actions{display:flex;align-items:center;gap:8px}
 .eyebrow{margin:0;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .title{margin:2px 0 6px;font-size:40px;line-height:1.05;font-weight:800;letter-spacing:-.025em}
 .lede{margin:0;font-size:17px;line-height:1.4;color:var(--muted);max-width:640px}
@@ -145,16 +147,15 @@ button,input,select{font:inherit;color:inherit}
 <div class="ios-bg" aria-hidden="true"><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span><span class="orb o4"></span></div>
 <main class="ios">
   <header class="head" id="topo">
-    <div>
-      <p class="eyebrow" id="periodo">—</p>
+    <div class="head-top">
       <h1 class="title">Saldo</h1>
-      <p class="lede" id="lede">—</p>
-      <div class="src-row">
-        <p class="src" id="fonte">Sem dados</p>
+      <div class="head-actions">
         <button type="button" class="btn" id="refresh" aria-label="Atualizar dados do Dropbox"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Atualizar</span></button>
+        <button type="button" class="icon-btn glass" id="open-settings" aria-label="Definições"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
     </div>
-    <button type="button" class="icon-btn glass" id="open-settings" aria-label="Definições"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <p class="lede" id="lede">—</p>
+    <div class="src-row"><p class="src" id="fonte">Sem dados</p></div>
   </header>
 
   <section class="card onboard" id="onboard" hidden>
@@ -168,6 +169,7 @@ button,input,select{font:inherit;color:inherit}
 
   <div id="app" hidden>
     <div class="controls">
+      <select class="pill" id="ano" aria-label="Ano"></select>
       <div class="chips glass" id="chips" role="group" aria-label="Período"></div>
       <select class="pill" id="conta" aria-label="Conta"></select>
     </div>
