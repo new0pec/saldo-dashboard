@@ -562,10 +562,10 @@
     clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, erro ? 6000 : 2600);
   }
   const abrir = id => { $(id).hidden = false; };
-  const fechar = id => { $(id).hidden = true; };
+  const fechar = id => { $(id).hidden = true; if (id === 'sh-form') fecharCalc(); };
   document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => fechar(b.closest('.sheet-wrap').id)));
-  document.querySelectorAll('.sheet-wrap').forEach(w => w.addEventListener('click', e => { if (e.target === w) w.hidden = true; }));
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.sheet-wrap').forEach(w => { w.hidden = true; }); });
+  document.querySelectorAll('.sheet-wrap').forEach(w => w.addEventListener('click', e => { if (e.target === w) fechar(w.id); }));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.querySelectorAll('.sheet-wrap').forEach(w => { w.hidden = true; }); fecharCalc(); } });
 
   function adicionar(mov) { M.movimentos.push({ id: novoId(), ...mov }); }
   function repetir(r) {
@@ -737,8 +737,8 @@
       return b;
     }));
   }
-  function abrirCalc() { $('calc').hidden = false; $('sh-form').classList.add('com-calc'); calcFaixa(); const sel = $('c-strip').querySelector('.on'); if (sel && sel.scrollIntoView) sel.scrollIntoView({ inline: 'center', block: 'nearest' }); }
-  function fecharCalc() { $('calc').hidden = true; $('sh-form').classList.remove('com-calc'); }
+  function abrirCalc() { $('calc').hidden = false; $('sh-form').classList.add('com-calc'); calcFaixa(); $('sh-form').querySelector('.sheet').style.paddingBottom = ($('calc').offsetHeight + 24) + 'px'; const sel = $('c-strip').querySelector('.on'); if (sel && sel.scrollIntoView) sel.scrollIntoView({ inline: 'center', block: 'nearest' }); }
+  function fecharCalc() { $('calc').hidden = true; $('sh-form').classList.remove('com-calc'); $('sh-form').querySelector('.sheet').style.paddingBottom = ''; }
   $('f-valor-btn').addEventListener('click', e => { e.stopPropagation(); C = F.valor && F.valor !== '0' ? F.valor : ''; abrirCalc(); fDesenha(); });
   $('sh-form').querySelector('.sheet').addEventListener('click', e => { if (!$('calc').hidden && !e.target.closest('#calc, #f-valor-btn, #f-tipo, #f-ok')) fecharCalc(); });
 
