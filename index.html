@@ -117,7 +117,9 @@ button,input,select{font:inherit;color:inherit}
 .tile-val{font-size:20px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;margin-top:2px}
 .search{width:100%;border-radius:12px;border:0;padding:10px 12px;font-size:16px;background:color-mix(in srgb,var(--fg) 7%,transparent);margin-bottom:8px;outline:none}
 .filter{border-radius:999px;border:0;padding:5px 12px;font-size:13px;font-weight:600;background:#FF9F0A;color:#fff;cursor:pointer}
-.txlist{list-style:none;margin:0;padding:0}
+.txlist{list-style:none;margin:0 -6px;padding:0 6px;max-height:min(60vh,560px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.txhead{position:sticky;top:0;z-index:2;background:color-mix(in srgb,var(--panel) 88%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+@media print{.txlist{max-height:none;overflow:visible}}
 .txhead{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:14px 4px 6px}
 .tx{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--line)}
 .tx-ico{width:38px;height:38px;border-radius:50%;font-size:15px}
