@@ -137,7 +137,12 @@
     const tok = await accessToken();
     if (!tok) throw new Error('Liga o Dropbox nas definições.');
     const r = await fetch(url, { method: 'POST', ...opts, headers: { Authorization: 'Bearer ' + tok, ...(opts && opts.headers) } });
-    if (r.status === 401) { store.del(CFG.tok); throw new Error('A sessão do Dropbox expirou. Liga outra vez.'); }
+    if (r.status === 401) {
+      let j = {}; try { j = JSON.parse(await r.text()); } catch (e) {}
+      const sum = j.error_summary || '';
+      if (/missing_scope|insufficient_scope/.test(sum)) { const err = new Error('Falta a permissão files.content.write na app do Dropbox. Ativa-a e liga de novo.'); err.summary = sum; throw err; }
+      store.del(CFG.tok); throw new Error('A sessão do Dropbox expirou. Liga outra vez.');
+    }
     if (!r.ok) {
       const t = await r.text(); let j = {}; try { j = JSON.parse(t); } catch (e) {}
       const err = new Error(j.error_summary ? 'Dropbox: ' + j.error_summary.replace(/\/\.*$/, '') : 'Erro do Dropbox (' + r.status + ')');
@@ -146,6 +151,9 @@
     }
     return r;
   }
+
+  const argHeader = o => JSON.stringify(o).replace(/[\u007f-\uffff]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+  const ligado = () => !!(appKey() && store.get(CFG.tok));
 
   async function listFolder(path) {
     return dbx('https://api.dropboxapi.com/2/files/list_folder', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, recursive: false }) });
@@ -176,6 +184,48 @@
   // ---------- Estado e cálculos ----------
   const S = { rows: [], meta: null, ano: '', mes: '', conta: '', grupo: '', categoria: '', q: '' };
   let drawnBars = false;
+
+  // ---------- Movimentos manuais e grupos personalizados (manuais.json no Dropbox) ----------
+  const MAN_KEY = 'saldo.manuais';
+  const normaliza = o => {
+    o = o && typeof o === 'object' ? o : {};
+    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [] };
+  };
+  let M = normaliza((() => { try { return JSON.parse(store.get(MAN_KEY) || 'null'); } catch (e) { return null; } })());
+  const manFile = () => folder() + '/manuais.json';
+  const grupoBase = cat => C2G.get(String(cat || '').toLowerCase()) || 'Outros';
+  function grupoDe(cat, etq, tipo) {
+    if (tipo === 'Transferência') return 'Transferências';
+    if (M.grupos[cat]) return M.grupos[cat];
+    if (/teclado|ipad|port[aá]til|monitor/i.test(etq || '')) return 'Tecnologia';
+    return grupoBase(cat);
+  }
+  function compose() {
+    const base = (S.base || []).map(r => r.tipo === 'Transferência' || !M.grupos[r.categoria] ? r : { ...r, grupo: M.grupos[r.categoria] });
+    const man = M.movimentos.filter(m => m && /^\d{4}-\d{2}-\d{2}$/.test(m.data)).map(m => ({
+      id: m.id, data: m.data, mes: m.data.slice(0, 7), montante: +m.montante, conta: m.conta, categoria: m.categoria, etiquetas: m.etiquetas || '',
+      tipo: m.tipo, grupo: grupoDe(m.categoria, m.etiquetas, m.tipo), manual: true }));
+    S.rows = base.concat(man);
+  }
+  async function loadManuais() {
+    if (!ligado()) return false;
+    try {
+      const r = await dbx('https://content.dropboxapi.com/2/files/download', { headers: { 'Dropbox-API-Arg': argHeader({ path: manFile() }) } });
+      const novo = normaliza(JSON.parse(await r.text()));
+      const mudou = JSON.stringify(novo) !== JSON.stringify(M);
+      M = novo; store.set(MAN_KEY, JSON.stringify(M));
+      return mudou;
+    } catch (e) { if (/not_found/.test(e.summary || '')) return false; throw e; }
+  }
+  async function saveManuais(okMsg) {
+    store.set(MAN_KEY, JSON.stringify(M));
+    compose(); render();
+    if (!ligado()) { toast('Guardado só neste dispositivo. Liga o Dropbox para sincronizar.'); return; }
+    try {
+      await dbx('https://content.dropboxapi.com/2/files/upload', { headers: { 'Dropbox-API-Arg': argHeader({ path: manFile(), mode: 'overwrite', mute: true }), 'Content-Type': 'application/octet-stream' }, body: JSON.stringify(M, null, 1) });
+      toast(okMsg || 'Guardado no Dropbox');
+    } catch (e) { toast(/scope/.test(e.summary || '') ? e.message : 'Ficou guardado neste dispositivo, mas não no Dropbox: ' + e.message, true); }
+  }
 
   function meses() {
     const m = new Map();
@@ -226,7 +276,7 @@
   function render() {
     const has = S.rows.length > 0;
     $('app').hidden = !has; $('onboard').hidden = has;
-    $('lede').hidden = !has; $('ano').hidden = !has;
+    $('lede').hidden = !has; $('ano').hidden = !has; $('fab').hidden = !has;
     if (!has) return;
     const ms = meses(), r = resumo(ms);
 
@@ -386,10 +436,15 @@
     const fmtD = s => { const [y, m, dd] = s.split('-'); return (+dd) + ' de ' + MES[+m - 1] + ' ' + y; };
     for (const r of rows.slice(0, N)) {
       if (r.data !== last) { out.push(el('li', 'txhead', fmtD(r.data))); last = r.data; }
-      const li = el('li', 'tx'), mid = el('div'); mid.style.minWidth = '0';
-      mid.append(el('div', 'tx-t', r.categoria), el('div', 'tx-s', [r.grupo, r.etiquetas, r.conta].filter(Boolean).join(' · ')));
+      const li = el('li', 'tx-wrap'), row = el('div', 'tx'), mid = el('div'); mid.style.minWidth = '0';
+      mid.append(el('div', 'tx-t', r.categoria), el('div', 'tx-s', [r.manual ? 'Manual' : '', r.grupo, r.etiquetas, r.conta].filter(Boolean).join(' · ')));
       const ti = el('div', 'tx-ico', ico(r.categoria)); ti.style.background = gcol(r.grupo);
-      li.append(ti, mid, el('div', 'tx-v' + (r.tipo === 'Transferência' ? ' mov' : r.montante > 0 ? ' pos' : ''), (r.montante > 0 ? '+' : '') + eur(r.montante)));
+      row.append(ti, mid, el('div', 'tx-v' + (r.tipo === 'Transferência' ? ' mov' : r.montante > 0 ? ' pos' : ''), (r.montante > 0 ? '+' : '') + eur(r.montante)));
+      const act = el('div', 'tx-act');
+      const bR = el('button', 'a-rep', 'Repetir'); bR.type = 'button'; bR.onclick = () => repetir(r);
+      const bE = el('button', 'a-edit', 'Editar'); bE.type = 'button'; bE.onclick = () => abrirForm(r, !r.manual);
+      act.append(bR, bE);
+      li.append(row, act); ligarDeslizar(li, row);
       out.push(li);
     }
     if (rows.length > N) out.push(el('li', 'tx-more', 'A mostrar ' + N + ' de ' + rows.length + ' movimentos. Use os filtros ou a pesquisa para afinar.'));
@@ -408,8 +463,8 @@
   }
 
   function useData(res, cache) {
-    const rows = parseExport(res.text);
-    S.rows = rows; S.meta = { name: res.name, modified: res.modified, origem: res.origem };
+    S.base = parseExport(res.text); compose();
+    const rows = S.rows; S.meta = { name: res.name, modified: res.modified, origem: res.origem };
     if (S.mes && !rows.some(r => r.mes === S.mes)) S.mes = '';
     if (S.ano && !rows.some(r => r.mes.startsWith(S.ano))) S.ano = '';
     if (cache) store.set(CFG.cache, JSON.stringify({ ...S.meta, text: res.text }));
@@ -426,9 +481,10 @@
     btn.classList.add('busy'); btn.setAttribute('aria-busy', 'true');
     try {
       const res = await latestFromDropbox();
+      let manMudou = false; try { manMudou = await loadManuais(); } catch (e) {}
       S.checked = new Date();
       const mudou = !S.meta || S.meta.name !== res.name || S.meta.modified !== res.modified || S.rows.length === 0 || !auto;
-      if (mudou) useData(res, true); else showSource(S.meta);
+      if (mudou) useData(res, true); else { if (manMudou) { compose(); render(); } showSource(S.meta); }
     }
     catch (e) { showSource(S.meta, e.message); if (!S.rows.length) render(); }
     finally { busy = false; btn.classList.remove('busy'); btn.removeAttribute('aria-busy'); }
@@ -461,7 +517,7 @@
     store.set(CFG.folder, $('cfg-folder').value.trim() || '/MyNewClaudee');
     try { await connect(); } catch (e) { $('cfg-msg').textContent = e.message; }
   };
-  $('cfg-logout').onclick = () => { store.del(CFG.tok); store.del(CFG.cache); S.rows = []; S.meta = null; showSource(null); render(); $('cfg-msg').textContent = 'Desligado. Os dados guardados neste dispositivo foram apagados.'; };
+  $('cfg-logout').onclick = () => { store.del(CFG.tok); store.del(CFG.cache); store.del(MAN_KEY); M = normaliza(null); S.base = []; S.rows = []; S.meta = null; showSource(null); render(); $('cfg-msg').textContent = 'Desligado. Os dados guardados neste dispositivo foram apagados.'; };
   const pickFile = () => $('file').click();
   $('cfg-file').onclick = pickFile;
   $('onboard-file').onclick = pickFile;
@@ -477,11 +533,163 @@
   $('search').addEventListener('input', e => { S.q = e.target.value; drawList(); });
   let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (S.rows.length) drawBars(meses()); }, 150); });
 
+  // ---------- Inserir e editar dados ----------
+  const hoje = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const novoId = () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const ORDEM_C = [/^activobank$/i, /^revolut/i, /^c\.?\s*c\.?\s*activobank|activobank\s*c\.?\s*c/i, /wizink/i, /^dinheiro/i, /alimenta/i];
+  const posC = c => { const i = ORDEM_C.findIndex(re => re.test(c)); return i < 0 ? 99 : i; };
+  const listaContas = () => [...new Set(contas().map(c => c.conta).concat(M.contas))].sort((a, b) => posC(a) - posC(b) || a.localeCompare(b, 'pt'));
+  const listaCats = () => [...new Set(S.rows.filter(r => r.tipo !== 'Transferência').map(r => r.categoria))].sort((a, b) => a.localeCompare(b, 'pt'));
+  const fmtValor = v => L.format(',.2f')(v);
+
+  let toastT;
+  function toast(msg, erro) {
+    const t = $('toast'); t.textContent = msg; t.classList.toggle('erro', !!erro); t.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, erro ? 6000 : 2600);
+  }
+  const abrir = id => { $(id).hidden = false; };
+  const fechar = id => { $(id).hidden = true; };
+  document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => fechar(b.closest('.sheet-wrap').id)));
+  document.querySelectorAll('.sheet-wrap').forEach(w => w.addEventListener('click', e => { if (e.target === w) w.hidden = true; }));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.sheet-wrap').forEach(w => { w.hidden = true; }); });
+
+  function adicionar(mov) { M.movimentos.push({ id: novoId(), ...mov }); }
+  function repetir(r) {
+    adicionar({ data: hoje(), tipo: r.tipo, montante: r.montante, conta: r.conta, categoria: r.categoria, etiquetas: r.etiquetas || '' });
+    fecharLinhas(); saveManuais('Repetido com a data de hoje');
+  }
+
+  // Deslizar as linhas da lista para mostrar Repetir e Editar
+  let linhaAberta = null;
+  function fecharLinhas() { if (linhaAberta) linhaAberta.classList.remove('open'); linhaAberta = null; }
+  function ligarDeslizar(li, row) {
+    let x0 = null;
+    row.addEventListener('pointerdown', e => { x0 = e.clientX; });
+    row.addEventListener('pointerup', e => {
+      if (x0 == null) return; const dx = e.clientX - x0; x0 = null;
+      if (dx < -30) { if (linhaAberta && linhaAberta !== li) fecharLinhas(); li.classList.add('open'); linhaAberta = li; }
+      else if (dx > 30) fecharLinhas();
+      else if (Math.abs(dx) < 6) { const ia = li.classList.contains('open'); fecharLinhas(); if (!ia) { li.classList.add('open'); linhaAberta = li; } }
+    });
+  }
+
+  // 1. Formulário completo
+  let fEdit = null, fTipo = 'Despesa';
+  function setTipo(t) { fTipo = t; $('f-tipo').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === t)); }
+  $('f-tipo').querySelectorAll('button').forEach(b => b.addEventListener('click', () => setTipo(b.dataset.v)));
+  function abrirForm(r, comoNovo) {
+    fecharLinhas();
+    fEdit = r && r.manual && !comoNovo ? r.id : null;
+    $('f-title').textContent = fEdit ? 'Editar movimento' : (r ? 'Novo movimento (cópia)' : 'Novo movimento');
+    setTipo(r ? r.tipo : 'Despesa');
+    $('f-valor').value = r && r.montante ? fmtValor(Math.abs(r.montante)) : '';
+    $('f-data').value = r && fEdit ? r.data : hoje();
+    const contasL = listaContas();
+    $('f-conta').replaceChildren(...contasL.map(c => new Option(c, c)), new Option('Nova conta…', '__nova__'));
+    $('f-conta').value = r && r.conta ? r.conta : (contasL[0] || '__nova__');
+    $('f-nova-wrap').hidden = $('f-conta').value !== '__nova__'; $('f-nova').value = '';
+    $('dl-cats').replaceChildren(...listaCats().map(c => new Option(c)));
+    $('f-cat').value = r ? r.categoria : '';
+    $('f-etq').value = r ? (r.etiquetas || '') : '';
+    $('f-del').hidden = !fEdit; $('f-msg').textContent = '';
+    fechar('sh-quick'); abrir('sh-form');
+  }
+  $('f-conta').addEventListener('change', () => { $('f-nova-wrap').hidden = $('f-conta').value !== '__nova__'; if (!$('f-nova-wrap').hidden) $('f-nova').focus(); });
+  $('f-ok').addEventListener('click', () => {
+    const v = parseFloat($('f-valor').value.replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
+    let conta = $('f-conta').value; const cat = $('f-cat').value.trim(); const data = $('f-data').value;
+    if (conta === '__nova__') { conta = $('f-nova').value.trim(); if (conta && !M.contas.includes(conta)) M.contas.push(conta); }
+    const erro = !(v > 0) ? 'Escreve um valor maior que zero.' : !/^\d{4}-\d{2}-\d{2}$/.test(data) ? 'Escolhe a data.' : !conta ? 'Escolhe ou escreve a conta.' : !cat ? 'Escreve a categoria.' : '';
+    if (erro) { $('f-msg').textContent = erro; return; }
+    const mov = { data, tipo: fTipo, montante: fTipo === 'Receita' ? v : -v, conta, categoria: cat, etiquetas: $('f-etq').value.trim() };
+    if (fEdit) { const i = M.movimentos.findIndex(m => m.id === fEdit); if (i >= 0) M.movimentos[i] = { ...M.movimentos[i], ...mov }; }
+    else adicionar(mov);
+    fechar('sh-form'); saveManuais(fEdit ? 'Movimento atualizado' : 'Movimento adicionado');
+  });
+  $('f-del').addEventListener('click', () => {
+    if (!fEdit || !window.confirm('Apagar este movimento?')) return;
+    M.movimentos = M.movimentos.filter(m => m.id !== fEdit);
+    fechar('sh-form'); saveManuais('Movimento apagado');
+  });
+
+  // 2. Teclado rápido
+  const Q = { s: '', sinal: -1, cat: '', conta: '' };
+  function qDesenha() {
+    const v = Q.s ? parseFloat(Q.s.replace(',', '.')) : 0;
+    $('q-val').textContent = (Q.sinal < 0 ? '−' : '+') + ' ' + (Q.s ? Q.s.replace(/^(\d+)/, d => L.format(',')(+d)) : '0') + ' €';
+    $('q-sign').textContent = Q.sinal < 0 ? 'Despesa' : 'Receita';
+    $('q-sign').classList.toggle('pos', Q.sinal > 0);
+    const desde = new Date(); desde.setDate(desde.getDate() - 120); const lim = desde.toISOString().slice(0, 10);
+    const cont = new Map();
+    for (const r of S.rows) if (r.tipo === (Q.sinal < 0 ? 'Despesa' : 'Receita') && r.data >= lim) cont.set(r.categoria, (cont.get(r.categoria) || 0) + 1);
+    let top = [...cont].sort((a, b) => b[1] - a[1]).slice(0, 8).map(x => x[0]);
+    if (Q.cat && !top.includes(Q.cat)) top = [Q.cat].concat(top.slice(0, 7));
+    const chip = (txt, on, fn) => { const b = el('button', 'qchip' + (on ? ' on' : ''), txt); b.type = 'button'; b.onclick = fn; return b; };
+    $('q-cats').replaceChildren(...top.map(c => chip(c, Q.cat === c, () => { Q.cat = c; qDesenha(); })), chip('Outra…', false, () => qMais()));
+    $('q-contas').replaceChildren(...listaContas().map(c => chip(c, Q.conta === c, () => { Q.conta = c; qDesenha(); })));
+    $('q-ok').classList.toggle('dim', !(v > 0 && Q.cat && Q.conta));
+  }
+  function abrirRapido() {
+    Q.s = ''; Q.sinal = -1; Q.cat = ''; Q.conta = listaContas()[0] || '';
+    qDesenha(); abrir('sh-quick');
+  }
+  function qMais() {
+    const v = Q.s ? parseFloat(Q.s.replace(',', '.')) : 0;
+    abrirForm({ tipo: Q.sinal < 0 ? 'Despesa' : 'Receita', montante: v, conta: Q.conta, categoria: Q.cat, etiquetas: '' }, true);
+    $('f-title').textContent = 'Novo movimento';
+  }
+  const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'];
+  $('q-kp').replaceChildren(...KEYS.map(k => { const b = el('button', 'key', k); b.type = 'button'; if (k === '⌫') b.setAttribute('aria-label', 'Apagar'); b.onclick = () => {
+    if (k === '⌫') Q.s = Q.s.slice(0, -1);
+    else if (k === ',') { if (!Q.s.includes(',')) Q.s = (Q.s || '0') + ','; }
+    else { const dec = Q.s.split(',')[1]; if (dec != null && dec.length >= 2) return; if (Q.s.replace(',', '').length >= 8) return; Q.s = (Q.s === '0' ? '' : Q.s) + k; }
+    qDesenha(); }; return b; }));
+  $('q-sign').addEventListener('click', () => { Q.sinal = -Q.sinal; Q.cat = ''; qDesenha(); });
+  $('q-mais').addEventListener('click', qMais);
+  $('q-ok').addEventListener('click', () => {
+    const v = Q.s ? parseFloat(Q.s.replace(',', '.')) : 0;
+    if (!(v > 0)) { toast('Escreve o valor.', true); return; }
+    if (!Q.cat) { toast('Escolhe a categoria.', true); return; }
+    if (!Q.conta) { toast('Escolhe a conta.', true); return; }
+    adicionar({ data: hoje(), tipo: Q.sinal < 0 ? 'Despesa' : 'Receita', montante: Q.sinal * v, conta: Q.conta, categoria: Q.cat, etiquetas: '' });
+    fechar('sh-quick'); saveManuais('Movimento adicionado');
+  });
+  $('fab').addEventListener('click', abrirRapido);
+
+  // 5. Editor de grupos
+  const NOMES_G = Object.keys(GRUPOS).filter(g => g !== 'Rendimentos' && g !== 'Dinheiro').concat(['Rendimentos', 'Dinheiro', 'Outros']);
+  let gPend = {};
+  function abrirGrupos() {
+    gPend = { ...M.grupos };
+    const cats = listaCats();
+    const atual = c => gPend[c] || grupoBase(c);
+    const porGrupo = new Map(NOMES_G.map(g => [g, []]));
+    for (const c of cats) { const g = atual(c); if (!porGrupo.has(g)) porGrupo.set(g, []); porGrupo.get(g).push(c); }
+    const out = [];
+    for (const [g, cs] of porGrupo) {
+      if (!cs.length) continue;
+      const h = el('div', 'g-head'); const dot = el('span', 'g-dot'); dot.style.background = gcol(g); h.append(dot, el('span', null, g + ' · ' + cs.length));
+      out.push(h);
+      for (const c of cs) {
+        const linha = el('label', 'g-row'); const sel = el('select', 'g-sel'); sel.setAttribute('aria-label', 'Grupo de ' + c);
+        sel.replaceChildren(...NOMES_G.map(n => new Option(n, n))); sel.value = atual(c);
+        sel.onchange = () => { if (sel.value === grupoBase(c)) delete gPend[c]; else gPend[c] = sel.value; linha.classList.add('mudou'); };
+        linha.append(el('span', 'g-cat', c), sel); out.push(linha);
+      }
+    }
+    $('g-list').replaceChildren(...out);
+    abrir('sh-grupos');
+  }
+  $('edit-grupos').addEventListener('click', abrirGrupos);
+  $('g-ok').addEventListener('click', () => { M.grupos = gPend; fechar('sh-grupos'); saveManuais('Grupos guardados'); });
+  $('g-reset').addEventListener('click', () => { if (!window.confirm('Voltar aos grupos originais?')) return; M.grupos = {}; fechar('sh-grupos'); saveManuais('Grupos repostos'); });
+
   // ---------- Arranque ----------
   (async function start() {
     try { await finishLogin(); } catch (e) { openSheet(e.message); }
     const c = JSON.parse(store.get(CFG.cache) || 'null');
     if (c && c.text) { try { useData(c, false); } catch (e) { store.del(CFG.cache); } }
+    else if (M.movimentos.length) { compose(); }
     render();
     if (appKey() && store.get(CFG.tok)) refresh(true);
   })();

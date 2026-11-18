@@ -142,6 +142,49 @@ button,input,select{font:inherit;color:inherit}
 .onboard h2{margin:0 0 8px;font-size:22px}
 .onboard p{color:var(--muted);line-height:1.5;margin:0 auto 16px;max-width:460px}
 .onboard .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.fab{position:fixed;right:calc(18px + env(safe-area-inset-right));bottom:calc(22px + env(safe-area-inset-bottom));z-index:10;width:58px;height:58px;border-radius:50%;border:0;background:#FF9F0A;color:#fff;font-size:32px;line-height:1;font-weight:400;cursor:pointer;box-shadow:0 10px 28px rgba(255,159,10,.45);transition:transform .15s}
+.fab:active{transform:scale(.92)}
+.sheet-top{display:flex;justify-content:space-between;align-items:center;margin:-4px 0 14px;gap:8px}
+.sheet-top b{font-size:16px}
+.sheet-top>*{flex:1}.sheet-top>b{text-align:center}.sheet-top>:last-child{text-align:right}
+.link{border:0;background:none;color:#FF9F0A;font-weight:600;font-size:15px;cursor:pointer;padding:4px 0;text-align:left}
+.seg{display:flex;background:color-mix(in srgb,var(--fg) 8%,transparent);border-radius:11px;padding:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:transparent;border-radius:9px;padding:7px 4px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--panel);color:var(--fg);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.frm{border-radius:16px;background:color-mix(in srgb,var(--fg) 5%,transparent);padding:2px 14px}
+.frm label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px;font-weight:500;color:var(--muted)}
+.frm label:last-child{border-bottom:0}
+.frm input,.frm select{border:0;background:transparent;text-align:right;font-size:16px;font-weight:600;min-width:0;flex:1;outline:none;padding:2px 0}
+.frm select{text-align-last:right;appearance:none;-webkit-appearance:none;cursor:pointer}
+.btn.big{width:100%;justify-content:center;padding:13px;font-size:16px;border-radius:14px;margin-top:12px}
+.btn.dim{opacity:.55}
+.q-amt{display:flex;flex-direction:column;align-items:center;gap:8px;margin:0 0 12px}
+.q-amt span{font-size:42px;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.q-sign{border:0;border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:700;background:color-mix(in srgb,#FF453A 18%,transparent);color:#FF453A;cursor:pointer}
+.q-sign.pos{background:color-mix(in srgb,#30D158 20%,transparent);color:#30D158}
+.q-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:8px;padding-bottom:2px}
+.q-chips::-webkit-scrollbar{display:none}
+.qchip{flex:0 0 auto;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;background:color-mix(in srgb,var(--panel) 60%,transparent);cursor:pointer}
+.qchip.on{background:#FF9F0A;border-color:transparent;color:#fff}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+.key{border:0;border-radius:14px;padding:13px 0;font-size:22px;font-weight:500;background:color-mix(in srgb,var(--fg) 7%,transparent);cursor:pointer}
+.key:active{background:color-mix(in srgb,var(--fg) 15%,transparent)}
+.tx-wrap{position:relative;overflow:hidden;list-style:none;border-bottom:1px solid var(--line)}
+.tx-wrap .tx{border-bottom:0;transition:transform .25s cubic-bezier(.2,.8,.2,1);touch-action:pan-y;cursor:pointer;user-select:none}
+.tx-act{position:absolute;right:0;top:0;bottom:0;display:flex;opacity:0;pointer-events:none;transition:opacity .2s}
+.tx-act button{border:0;color:#fff;font-weight:600;font-size:13px;width:82px;cursor:pointer}
+.a-rep{background:#0A84FF}.a-edit{background:#8E8E93}
+.tx-wrap.open .tx{transform:translateX(-164px)}
+.tx-wrap.open .tx-act{opacity:1;pointer-events:auto}
+.g-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--muted);margin:14px 2px 6px}
+.g-dot{width:10px;height:10px;border-radius:50%}
+.g-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;margin:0 0 5px!important;border-radius:12px;background:color-mix(in srgb,var(--fg) 5%,transparent);font-size:14px!important;font-weight:600!important;color:var(--fg)!important}
+.g-row.mudou{box-shadow:inset 0 0 0 1.5px #FF9F0A}
+.g-cat{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g-sel{border:1px solid var(--line);border-radius:9px;padding:5px 8px;font-size:13px;background:var(--panel);max-width:55%}
+.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;max-width:calc(100% - 32px);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#fff;background:rgba(30,30,32,.92);box-shadow:0 8px 24px rgba(0,0,0,.25);text-align:center}
+.toast.erro{background:rgba(180,40,40,.95);border-radius:16px}
+.card-head .link{font-size:14px}
 [hidden]{display:none!important}
 @media (max-width:520px){.title{font-size:34px}.hero-num{font-size:38px}.ring{width:124px;height:124px}}
 @media (prefers-reduced-motion:no-preference){.card,.tile{animation:in .5s cubic-bezier(.2,.8,.2,1) both}@keyframes in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}}
@@ -197,7 +240,8 @@ button,input,select{font:inherit;color:inherit}
     </section>
 
     <section class="card" id="grupos">
-      <div class="card-head"><h2>Gastos por grupo</h2><p class="hint">Toque num grupo para ver as categorias e os movimentos</p></div>
+      <div class="card-head"><h2>Gastos por grupo</h2><button type="button" class="link" id="edit-grupos">Editar grupos</button></div>
+      <p class="hint" style="margin:-4px 0 10px">Toque num grupo para ver as categorias e os movimentos</p>
       <div class="gbar" id="gbar" role="img"></div>
       <div class="gtiles" id="gtiles"></div>
     </section>
@@ -246,6 +290,47 @@ button,input,select{font:inherit;color:inherit}
     <p class="msg" id="cfg-msg"></p>
   </div>
 </div>
+<button type="button" class="fab" id="fab" aria-label="Adicionar movimento" hidden>+</button>
+
+<div class="sheet-wrap" id="sh-quick" hidden>
+  <div class="sheet glass" role="dialog" aria-modal="true" aria-label="Adicionar movimento">
+    <div class="sheet-top"><button type="button" class="link" data-close>Cancelar</button><b>Novo movimento</b><button type="button" class="link" id="q-mais">Mais opções</button></div>
+    <div class="q-amt"><button type="button" class="q-sign" id="q-sign">Despesa</button><span id="q-val" aria-live="polite">− 0 €</span></div>
+    <div class="q-chips" id="q-cats" role="group" aria-label="Categoria"></div>
+    <div class="q-chips" id="q-contas" role="group" aria-label="Conta"></div>
+    <div class="kp" id="q-kp"></div>
+    <button type="button" class="btn big" id="q-ok">Adicionar</button>
+  </div>
+</div>
+
+<div class="sheet-wrap" id="sh-form" hidden>
+  <div class="sheet glass" role="dialog" aria-modal="true" aria-labelledby="f-title">
+    <div class="sheet-top"><button type="button" class="link" data-close>Cancelar</button><b id="f-title">Novo movimento</b><span></span></div>
+    <div class="seg" id="f-tipo" role="group" aria-label="Tipo"><button type="button" data-v="Despesa" class="on">Despesa</button><button type="button" data-v="Receita">Receita</button><button type="button" data-v="Transferência">Transferência</button></div>
+    <div class="frm">
+      <label>Valor<input id="f-valor" inputmode="decimal" autocomplete="off" placeholder="0,00 €"></label>
+      <label>Data<input id="f-data" type="date"></label>
+      <label>Conta<select id="f-conta"></select></label>
+      <label id="f-nova-wrap" hidden>Conta nova<input id="f-nova" autocomplete="off" placeholder="Dinheiro"></label>
+      <label>Categoria<input id="f-cat" list="dl-cats" autocomplete="off" placeholder="Continente"></label>
+      <label>Etiquetas<input id="f-etq" autocomplete="off" placeholder="Alimentos"></label>
+    </div>
+    <p class="msg" id="f-msg" role="alert"></p>
+    <button type="button" class="btn big" id="f-ok">Guardar</button>
+    <button type="button" class="btn sec big" id="f-del" hidden>Apagar movimento</button>
+  </div>
+</div>
+
+<div class="sheet-wrap" id="sh-grupos" hidden>
+  <div class="sheet glass" role="dialog" aria-modal="true" aria-label="Editar grupos">
+    <div class="sheet-top"><button type="button" class="link" data-close>Cancelar</button><b>Grupos</b><button type="button" class="link" id="g-ok">Guardar</button></div>
+    <p>Escolhe o grupo de cada categoria. As alterações valem também para os movimentos do MoneyStats.</p>
+    <div id="g-list"></div>
+    <button type="button" class="btn sec big" id="g-reset">Repor grupos originais</button>
+  </div>
+</div>
+<datalist id="dl-cats"></datalist>
+<div class="toast" id="toast" role="status" hidden></div>
 <input type="file" id="file" accept=".txt,.csv,text/plain,text/csv" hidden>
 
 <script src="app.js"></script>
