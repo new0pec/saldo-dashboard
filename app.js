@@ -47,6 +47,10 @@
     .replace(/\s+,/g, ',').replace(/,\s*,/g, ',').replace(/\s{2,}/g, ' ')
     .replace(/^[\s.,]+|[\s,]+$/g, '');
 
+  // Nomes das contas no dashboard (o MoneyStats continua com os seus)
+  const NOMES_CONTA = [[/^revolut(\s+[a-z]\.?)?$/i, 'Revolut'], [/^c\.?\s*c\.?\s*activobank$/i, 'ActivoBank C.C.'], [/^c\.?\s*c\.?\s*wizink$/i, 'WiZink C.C.'], [/^activobank$/i, 'ActivoBank'], [/^dinheiro$/i, 'Dinheiro'], [/^cart[aã]o\s+alimenta[cç][aã]o$/i, 'Cartão Alimentação']];
+  const nomeConta = c => { c = String(c || '').trim(); for (const [re, n] of NOMES_CONTA) if (re.test(c)) return n; return c; };
+
   function parseCSV(t) {
     const R = []; let row = [], f = '', q = false;
     for (let i = 0; i < t.length; i++) {
@@ -77,7 +81,7 @@
       let grupo = C2G.get(cat.toLowerCase()) || 'Outros';
       if (/teclado|ipad|port[aá]til|monitor/i.test(etq)) grupo = 'Tecnologia';
       if (interna) grupo = 'Transferências';
-      rows.push({ data, mes: data.slice(0, 7), montante: v, conta: limpa(r[0]), grupo, categoria: cat, etiquetas: etq,
+      rows.push({ data, mes: data.slice(0, 7), montante: v, conta: nomeConta(limpa(r[0])), grupo, categoria: cat, etiquetas: etq,
         tipo: interna ? 'Transferência' : (v > 0 ? 'Receita' : 'Despesa') });
     }
     if (!rows.length) throw new Error('O ficheiro não tem movimentos.');
@@ -191,7 +195,18 @@
     o = o && typeof o === 'object' ? o : {};
     return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {} };
   };
-  let M = normaliza((() => { try { return JSON.parse(store.get(MAN_KEY) || 'null'); } catch (e) { return null; } })());
+  function migraNomes(o) {
+    o.movimentos.forEach(m => { if (m) m.conta = nomeConta(m.conta); });
+    o.contas = [...new Set(o.contas.map(nomeConta))];
+    const sal = {};
+    for (const [c, a] of Object.entries(o.saldos)) {
+      const n = nomeConta(c);
+      if (sal[n]) sal[n] = { real: +sal[n].real + +a.real, calc: +sal[n].calc + +a.calc, em: a.em > sal[n].em ? a.em : sal[n].em };
+      else sal[n] = a;
+    }
+    o.saldos = sal; return o;
+  }
+  let M = migraNomes(normaliza((() => { try { return JSON.parse(store.get(MAN_KEY) || 'null'); } catch (e) { return null; } })()));
   const manFile = () => folder() + '/manuais.json';
   const grupoBase = cat => C2G.get(String(cat || '').toLowerCase()) || 'Outros';
   function grupoDe(cat, etq, tipo) {
@@ -225,7 +240,7 @@
     if (!ligado()) return false;
     try {
       const r = await dbx('https://content.dropboxapi.com/2/files/download', { headers: { 'Dropbox-API-Arg': argHeader({ path: manFile() }) } });
-      const novo = normaliza(JSON.parse(await r.text()));
+      const novo = migraNomes(normaliza(JSON.parse(await r.text())));
       const mudou = JSON.stringify(novo) !== JSON.stringify(M);
       M = novo; store.set(MAN_KEY, JSON.stringify(M));
       return mudou;
@@ -546,7 +561,7 @@
     store.set(CFG.folder, $('cfg-folder').value.trim() || '/MyNewClaudee');
     try { await connect(); } catch (e) { $('cfg-msg').textContent = e.message; }
   };
-  $('cfg-logout').onclick = () => { store.del(CFG.tok); store.del(CFG.cache); store.del(MAN_KEY); M = normaliza(null); S.base = []; S.rows = []; S.meta = null; showSource(null); render(); $('cfg-msg').textContent = 'Desligado. Os dados guardados neste dispositivo foram apagados.'; };
+  $('cfg-logout').onclick = () => { store.del(CFG.tok); store.del(CFG.cache); store.del(MAN_KEY); M = migraNomes(normaliza(null)); S.base = []; S.rows = []; S.meta = null; showSource(null); render(); $('cfg-msg').textContent = 'Desligado. Os dados guardados neste dispositivo foram apagados.'; };
   const pickFile = () => $('file').click();
   $('cfg-file').onclick = pickFile;
   $('onboard-file').onclick = pickFile;
