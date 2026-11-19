@@ -48,7 +48,7 @@
     .replace(/^[\s.,]+|[\s,]+$/g, '');
 
   // Nomes das contas no dashboard (o MoneyStats continua com os seus)
-  const NOMES_CONTA = [[/^revolut(\s+[a-z]\.?)?$/i, 'Revolut'], [/^c\.?\s*c\.?\s*activobank$/i, 'ActivoBank C.C.'], [/^c\.?\s*c\.?\s*wizink$/i, 'WiZink C.C.'], [/^activobank$/i, 'ActivoBank'], [/^dinheiro$/i, 'Dinheiro'], [/^cart[aã]o\s+alimenta[cç][aã]o$/i, 'Cartão Alimentação']];
+  const NOMES_CONTA = [[/^c\.?\s*c\.?\s*activobank$/i, 'ActivoBank C.C.'], [/^c\.?\s*c\.?\s*wizink$/i, 'WiZink C.C.'], [/^activobank$/i, 'ActivoBank'], [/^dinheiro$/i, 'Dinheiro'], [/^cart[aã]o\s+alimenta[cç][aã]o$/i, 'Cartão Alimentação']];
   const nomeConta = c => { c = String(c || '').trim(); for (const [re, n] of NOMES_CONTA) if (re.test(c)) return n; return c; };
 
   function parseCSV(t) {
