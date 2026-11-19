@@ -255,6 +255,88 @@ button,input,select{font:inherit;color:inherit}
 .tile-nota.ok{color:#30D158}
 .total-card{margin:10px 0 12px;padding:16px 18px}
 .total-val{margin:4px 0 2px;font-size:34px;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.tv{position:fixed;inset:0;z-index:35;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;
+  --t-label:#fff;--t-label2:rgba(235,235,245,.74);--t-sep:rgba(84,84,88,.65);--t-fill:rgba(120,120,128,.26);--t-green:#30d158;--t-greentext:#30d158;--t-redtext:#ffa49e;--t-orange:#ffb340;--t-red:#ff6961;
+  --t-glass:rgba(16,20,36,.55);--t-glass-strong:rgba(30,30,33,.74);--t-glass-solid:rgba(28,28,30,.96);--t-border:rgba(255,255,255,.16);--t-hi:rgba(255,255,255,.26);--t-shadow:rgba(0,0,0,.45);--t-card:rgba(22,24,34,.55);--t-tiletext:#000;
+  --s1:#5ee8b5;--s2:#8fb2ff;--s3:#ffc65c;--s4:#ff9cc2;--s5:#c3adff;--s6:#6fe0f0;
+  color:var(--t-label);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,system-ui,sans-serif;font-variant-numeric:tabular-nums;line-height:1.3;letter-spacing:-.01em;
+  background:linear-gradient(180deg,color-mix(in srgb,#FF9F0A 16%,var(--page)) 0%,color-mix(in srgb,#FF2D55 13%,var(--page)) 55%,color-mix(in srgb,#BF2D7A 12%,var(--page)) 100%)}
+@media (prefers-color-scheme:light){.tv{--t-label:#000;--t-label2:rgba(60,60,67,.8);--t-sep:rgba(60,60,67,.29);--t-fill:rgba(120,120,128,.14);--t-green:#1e7b34;--t-greentext:#17662a;--t-redtext:#c00013;--t-orange:#c93400;--t-red:#d70015;--t-glass:rgba(255,255,255,.74);--t-glass-strong:rgba(255,255,255,.86);--t-glass-solid:rgba(255,255,255,.97);--t-border:rgba(255,255,255,.9);--t-hi:#fff;--t-shadow:rgba(30,30,60,.16);--t-card:rgba(255,255,255,.72);--t-tiletext:#fff;--s1:#057a58;--s2:#2f5bd8;--s3:#9a5c00;--s4:#c43a76;--s5:#7650d6;--s6:#08788b}}
+.tv *{box-sizing:border-box}
+.tv button{font:inherit;color:inherit}
+.tv-app{max-width:720px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 8px) max(16px,env(safe-area-inset-right)) calc(62px + env(safe-area-inset-bottom) + 48px) max(16px,env(safe-area-inset-left))}
+.tv-glass{background:var(--t-glass);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);border:.5px solid var(--t-border);box-shadow:inset 0 1px 0 var(--t-hi),inset 0 -1px 0 rgba(255,255,255,.04),0 8px 24px var(--t-shadow)}
+.tv-nav{display:flex;gap:10px;height:44px;margin-bottom:6px}
+.tv-sp{flex:1}
+.tv-btn{width:44px;height:44px;border-radius:22px;display:grid;place-items:center;cursor:pointer;transition:transform .15s}
+.tv-btn:active{transform:scale(.94)}
+.tv-btn svg{width:20px;height:20px}
+.tv-h1{font-size:34px;font-weight:700;letter-spacing:.01em;line-height:1.2;margin:0}
+.tv-updated{display:inline-flex;align-items:center;gap:6px;margin:6px 0 0;padding:4px 10px;border-radius:999px;font-size:13px;color:var(--t-label2)}
+.tv-live{width:7px;height:7px;border-radius:50%;background:var(--t-green)}
+.tv-hero{margin-top:14px;border-radius:34px;padding:18px 18px 18px 20px;display:grid;gap:6px}
+.tv-hero-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tv-label{font-size:15px;font-weight:600;color:var(--t-label2)}
+.tv-amount{font-family:ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif;font-size:clamp(38px,11vw,48px);font-weight:700;letter-spacing:-.02em;line-height:1.1;word-break:break-word}
+.tv-status-line{display:flex;flex-wrap:wrap;align-items:center;gap:0 5px;font-size:15px;color:var(--t-label2)}
+.tv-st{display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--t-greentext)}
+.tv-st::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
+.tv-st.warning{color:var(--t-orange)}.tv-st.danger{color:var(--t-redtext)}
+.tv-trend{display:grid;gap:8px;margin-top:8px;font-size:13px;color:var(--t-label2)}
+.tv-trend .tv-spark{width:100%;height:56px}
+.tv-up{color:var(--t-greentext);font-weight:600}.tv-down{color:var(--t-redtext);font-weight:600}
+.tv-reveal{position:relative;width:32px;height:32px;border-radius:16px;flex-shrink:0;display:grid;place-items:center;border:0;background:transparent;color:var(--t-label2);cursor:pointer}
+.tv-reveal::before{content:'';position:absolute;inset:-6px;border-radius:50%}
+.tv-reveal:hover{color:var(--t-label);background:var(--t-fill)}
+.tv-reveal svg{width:18px;height:18px}
+.is-hidden .tv-amount,.is-hidden .tv-value{letter-spacing:.12em}
+.tv section{scroll-margin-top:12px}
+.tv-h2{font-size:22px;font-weight:700;letter-spacing:-.01em;margin:26px 4px 10px}
+.tv-list{list-style:none;margin:0;padding:0;background:var(--t-card);border-radius:26px;overflow:hidden;-webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);border:.5px solid var(--t-border)}
+.tv-row{--c:var(--s1);position:relative;display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;align-items:center;gap:12px;min-height:72px;padding:12px 8px 12px 16px}
+.tv-row+.tv-row::before{content:'';position:absolute;top:0;left:64px;right:0;border-top:.5px solid var(--t-sep)}
+.tv-tile{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--c);color:var(--t-tiletext);font-family:ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif;font-size:17px;font-weight:700}
+.tv-text{min-width:0;display:grid;gap:2px}
+.tv-name{font-size:17px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tv-sub{display:flex;flex-wrap:wrap;align-items:center;gap:0 5px;font-size:15px;color:var(--t-label2)}
+.tv-right{display:grid;justify-items:end;gap:4px}
+.tv-value{font-family:ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif;font-size:17px;font-weight:600;white-space:nowrap}
+.tv-row .tv-spark{width:70px;height:18px}
+.tv-spark .base{stroke:var(--t-sep);stroke-width:1;vector-effect:non-scaling-stroke}
+.tv-spark rect.up{fill:var(--t-green)}.tv-spark rect.down{fill:var(--t-red)}.tv-spark rect.flat{fill:var(--t-label2)}
+.tv-spark{cursor:pointer;touch-action:manipulation}
+.tv-spark rect{transition:opacity .15s}
+.tv-spark.has-active rect:not(.active){opacity:.35}
+.tv-tip{position:fixed;z-index:45;pointer-events:none;padding:6px 10px;border-radius:12px;background:var(--t-glass-solid);color:var(--t-label);border:.5px solid var(--t-border);box-shadow:0 6px 18px var(--t-shadow);font-size:13px;font-weight:600;white-space:nowrap;opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s;left:0;top:0}
+.tv-tip.show{opacity:1;transform:none}
+.tv-distbox{background:var(--t-card);border-radius:26px;padding:16px;display:grid;gap:12px;-webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);border:.5px solid var(--t-border)}
+.tv-stack{display:flex;gap:3px;height:10px;border-radius:6px;overflow:hidden;background:var(--t-fill)}
+.tv-stack i{display:block;height:100%;min-width:3px}
+.tv-legend{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.tv-legend li{display:grid;grid-template-columns:10px minmax(0,1fr) auto;align-items:center;gap:8px;font-size:15px}
+.tv-legend .sw{width:10px;height:10px;border-radius:3px}
+.tv-legend .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tv-legend .val{color:var(--t-label2)}
+.tv-foot{margin-top:22px;text-align:center}
+.tv-foot span{display:inline-block;padding:6px 14px;border-radius:999px;font-size:13px;color:var(--t-label2)}
+.tv-tabbar{position:fixed;z-index:40;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 12px);display:flex;justify-content:center;pointer-events:none}
+.tv-tabs{pointer-events:auto;display:flex;padding:4px;border-radius:31px;height:62px;background:var(--t-glass-strong)}
+.tv-tab{width:92px;display:grid;place-items:center;align-content:center;gap:2px;border-radius:27px;text-decoration:none;color:var(--t-label);font-size:10px;font-weight:500;letter-spacing:.01em;cursor:pointer}
+.tv-tab svg{width:24px;height:24px}
+.tv-tab[aria-current="true"]{background:var(--t-fill);color:var(--t-greentext);font-weight:600}
+.total-card{cursor:pointer;display:block;width:100%;text-align:left;color:inherit;font:inherit}
+.total-card .tv-ver{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:14px;font-weight:600;color:#FF9F0A}
+@media (prefers-reduced-motion:reduce){.tv{scroll-behavior:auto}}
+.tv-row{grid-template-columns:36px minmax(0,1fr) auto auto}
+.tv-acoes{display:flex;flex-direction:column;gap:2px}
+.tv-nota{font-size:12.5px;color:var(--t-label2)}
+.tv-nota.ok{color:var(--t-greentext)}
+.tv-acertos{font-size:13px;color:var(--t-label2)}
+.tv-h2row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.tv-h2row .tv-h2{margin-right:0}
+.tv-link{border:0;background:none;color:#FF9F0A;font-weight:600;font-size:15px;cursor:pointer;margin-right:4px}
+.tv-hint{margin:-4px 4px 10px;font-size:13px;color:var(--t-label2)}
+#sh-acerto{z-index:50}
 [hidden]{display:none!important}
 @media (max-width:520px){.title{font-size:34px}.hero-num{font-size:38px}.ring{width:124px;height:124px}}
 @media (prefers-reduced-motion:no-preference){.card,.tile{animation:in .5s cubic-bezier(.2,.8,.2,1) both}@keyframes in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}}
@@ -267,12 +349,13 @@ button,input,select{font:inherit;color:inherit}
     <div class="head-top">
       <h1 class="title">Saldo</h1>
       <div class="head-actions">
+        <button type="button" class="icon-btn glass" id="abrir-total-topo" aria-label="Total disponível"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18"/><path d="M16 15h2"/><path d="M6 6l9-3 1 3"/></svg></button>
         <button type="button" class="btn" id="refresh" aria-label="Atualizar dados do Dropbox"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Atualizar</span></button>
         <button type="button" class="icon-btn glass" id="open-settings" aria-label="Definições"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
     </div>
     <p class="lede" id="lede">—</p>
-    <div class="src-row"><p class="src" id="fonte">Sem dados</p><select class="pill pill-sm" id="ano" aria-label="Ano"></select></div>
+    <div class="src-row"><p class="src" id="fonte">Sem dados</p></div>
   </header>
 
   <section class="card onboard" id="onboard" hidden>
@@ -287,6 +370,7 @@ button,input,select{font:inherit;color:inherit}
   <div id="app" hidden>
     <div class="controls">
       <div class="chips glass" id="chips" role="group" aria-label="Período"></div>
+      <select class="pill" id="ano" aria-label="Ano"></select>
       <select class="pill" id="conta" aria-label="Conta"></select>
     </div>
 
@@ -323,11 +407,12 @@ button,input,select{font:inherit;color:inherit}
 
     <section class="sec-wrap" id="contas">
       <div class="card-head"><h2 class="sec-title">Contas</h2><button type="button" class="link" id="nova-conta">+ Nova conta</button></div>
-      <div class="card total-card">
+      <button type="button" class="card total-card" id="abrir-total" aria-label="Ver o total disponível em detalhe">
         <p class="label">Total disponível em todas as contas</p>
         <p class="total-val" id="total-contas">—</p>
         <p class="hint" id="total-nota"></p>
-      </div>
+        <span class="tv-ver">Ver detalhe <span aria-hidden="true">›</span></span>
+      </button>
       <p class="hint">Toca numa conta para filtrar a página. Toca no lápis para pores o saldo real que vês na app do banco.</p>
       <div class="tiles" id="tiles"></div>
     </section>
@@ -443,6 +528,47 @@ button,input,select{font:inherit;color:inherit}
 </div>
 <datalist id="dl-cats"></datalist>
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="tv" id="tv" hidden role="dialog" aria-modal="true" aria-label="Total disponível">
+  <div class="tv-app">
+    <div class="tv-nav">
+      <button class="tv-glass tv-btn tv-back" id="tv-fechar" type="button" aria-label="Voltar ao Saldo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <span class="tv-sp"></span>
+      <button class="tv-glass tv-btn" id="tv-reveal-all" type="button" aria-pressed="false" aria-label="Mostrar todos os saldos" title="Mostrar todos os saldos"></button>
+    </div>
+    <header>
+      <h1 class="tv-h1">Saldo</h1>
+      <p class="tv-glass tv-updated"><span class="tv-live" aria-hidden="true"></span><span id="tv-updated">—</span></p>
+    </header>
+    <main>
+      <section id="tv-total" class="tv-glass tv-hero is-hidden" aria-labelledby="tv-total-label">
+        <div class="tv-hero-head"><span class="tv-label" id="tv-total-label">Total disponível</span><button class="tv-reveal" type="button" data-tvreveal="__total"></button></div>
+        <div class="tv-amount" id="tv-total-amount" aria-live="polite">—</div>
+        <div class="tv-status-line" id="tv-total-meta"></div>
+        <div class="tv-trend" id="tv-total-trend"></div>
+        <div class="tv-acertos" id="tv-acertos"></div>
+      </section>
+      <section id="tv-contas" aria-labelledby="tv-contas-title">
+        <div class="tv-h2row"><h2 class="tv-h2" id="tv-contas-title">Contas</h2><button type="button" class="tv-link" id="tv-nova-conta">+ Nova conta</button></div>
+        <p class="tv-hint">Olho para mostrar ou esconder o saldo · lápis para pores o saldo real que vês na app do banco.</p>
+        <ul class="tv-list" id="tv-cards"></ul>
+      </section>
+      <section id="tv-dist" aria-labelledby="tv-dist-title">
+        <h2 class="tv-h2" id="tv-dist-title">Distribuição</h2>
+        <div class="tv-distbox"><div class="tv-stack" id="tv-stack"></div><ul class="tv-legend" id="tv-legend"></ul></div>
+      </section>
+    </main>
+    <p class="tv-foot"><span class="tv-glass">Saldos com os acertos que fizeste · variação diária calculada a partir dos movimentos</span></p>
+  </div>
+  <div class="tv-tabbar">
+    <nav class="tv-glass tv-tabs" aria-label="Secções">
+      <a class="tv-tab" href="#tv-total" data-section="tv-total" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18"/><path d="M16 15h2"/><path d="M6 6l9-3 1 3"/></svg><span>Total</span></a>
+      <a class="tv-tab" href="#tv-contas" data-section="tv-contas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1" fill="currentColor"/><circle cx="3.5" cy="12" r="1" fill="currentColor"/><circle cx="3.5" cy="18" r="1" fill="currentColor"/></svg><span>Contas</span></a>
+      <a class="tv-tab" href="#tv-dist" data-section="tv-dist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12A9 9 0 1 1 12 3v9Z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15Z"/></svg><span>Distribuição</span></a>
+    </nav>
+  </div>
+  <div class="tv-tip" id="tv-tip" aria-hidden="true"></div>
+</div>
+
 <input type="file" id="file" accept=".txt,.csv,text/plain,text/csv" hidden>
 
 <script src="app.js"></script>

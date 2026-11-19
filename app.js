@@ -360,6 +360,7 @@
     drawCats();
     drawTiles(cs);
     drawList();
+    if (typeof tvDesenha === 'function' && TV.aberta) tvDesenha();
   }
 
   function drawRing(r) {
@@ -594,7 +595,7 @@
   // Enquanto há uma folha aberta, a página de trás não rola (iOS incluído)
   let scrollGuardado = 0;
   function bloquearFundo() {
-    const aberta = [...document.querySelectorAll('.sheet-wrap')].some(w => !w.hidden);
+    const aberta = [...document.querySelectorAll('.sheet-wrap, .tv')].some(w => !w.hidden);
     const b = document.body;
     if (aberta && !b.classList.contains('bloqueado')) { scrollGuardado = window.scrollY; b.style.top = -scrollGuardado + 'px'; b.classList.add('bloqueado'); }
     else if (!aberta && b.classList.contains('bloqueado')) { b.classList.remove('bloqueado'); b.style.top = ''; window.scrollTo(0, scrollGuardado); }
@@ -829,6 +830,138 @@
     if (contas().some(c => c.conta.toLowerCase() === nome.toLowerCase())) { toast('Essa conta já existe.', true); return; }
     abrirAcerto({ conta: nome, calc: 0, saldo: 0, acerto: null });
   });
+
+  // ---------- Vista "Total disponível" (como o Saldo Positivo) ----------
+  const TV = { revelados: new Set(), aberta: false };
+  const TV_AVISO = 500, TV_PERIGO = 100, TV_DIAS = 14, TV_MASK = '•••••';
+  const TV_EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const TV_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+  const tvPct = new Intl.NumberFormat('pt-PT', { style: 'percent', maximumFractionDigits: 0 });
+  const tvEuro = (v, esc) => esc ? TV_MASK : eur(v);
+  const tvDelta = (v, esc) => esc ? TV_MASK : (v > 0 ? '+' : '') + eur(v);
+  const TV_ESTADO = { '': 'Saudável', warning: 'Atenção', danger: 'Baixo' };
+  const tvEstado = v => v < TV_PERIGO ? 'danger' : v < TV_AVISO ? 'warning' : '';
+  const TV_GENERICAS = new Set(['conta', 'contas', 'cc', 'c', 'cartao', 'corrente', 'ordem', 'poupanca', 'ordenado', 'de', 'do', 'da', 'e', 'a', 'o']);
+  const tvNorm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const tvInicial = nome => { const w = nome.split(/[\s./\\()\-–—,:;|]+/).filter(Boolean).find(x => x.length > 1 && !TV_GENERICAS.has(tvNorm(x))); return ((w || nome).match(/[\p{L}\p{N}]/u) || ['?'])[0].toUpperCase(); };
+  const tvDiaFmt = new Intl.DateTimeFormat('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  const tvDia = d => tvDiaFmt.format(new Date(d + 'T12:00:00')).replace('.', '');
+  const TV_EPS = 0.005, tvDir = d => d > TV_EPS ? 'up' : d < -TV_EPS ? 'down' : 'flat';
+  const TV_DIR = { up: 'subiu', down: 'desceu', flat: 'sem alteração' };
+  function tvDias() { const out = [], d = new Date(); for (let i = TV_DIAS - 1; i >= 0; i--) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() - i, 12); out.push(isoDia(x)); } return out; }
+  function tvVariacoes(conta) {
+    const dias = tvDias(), m = new Map(dias.map(d => [d, 0]));
+    for (const r of S.rows) if ((conta == null || r.conta === conta) && m.has(r.data)) m.set(r.data, m.get(r.data) + r.montante);
+    return dias.map(d => ({ d, delta: Math.round(m.get(d) * 100) / 100 }));
+  }
+  function tvBarras(changes, nome, esc) {
+    const n = changes.length, slot = 10, bw = 6, h = 32, mid = h / 2, room = mid - 2;
+    const maxAbs = Math.max(...changes.map(c => Math.abs(c.delta)), TV_EPS), conta = { up: 0, down: 0, flat: 0 };
+    const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('class', 'tv-spark'); svg.setAttribute('viewBox', `0 0 ${n * slot} ${h}`); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('role', 'img');
+    const base = document.createElementNS(ns, 'line'); base.setAttribute('class', 'base'); base.setAttribute('x1', 0); base.setAttribute('x2', n * slot); base.setAttribute('y1', mid); base.setAttribute('y2', mid); svg.append(base);
+    changes.forEach((c, i) => {
+      const dir = tvDir(c.delta); conta[dir]++;
+      const len = dir === 'flat' ? 2 : Math.max(3, Math.sqrt(Math.abs(c.delta) / maxAbs) * room);
+      const r = document.createElementNS(ns, 'rect');
+      r.setAttribute('class', dir); r.setAttribute('x', i * slot + (slot - bw) / 2); r.setAttribute('y', dir === 'flat' ? mid - 1 : dir === 'down' ? mid : mid - len);
+      r.setAttribute('width', bw); r.setAttribute('height', len); r.setAttribute('rx', 1.5);
+      r.dataset.tip = tvDia(c.d) + ': ' + (esc ? TV_DIR[dir] : dir === 'flat' ? 'sem alteração' : tvDelta(c.delta));
+      svg.append(r);
+    });
+    svg.setAttribute('aria-label', `Evolução diária de ${nome}: ${conta.up} ${conta.up === 1 ? 'dia' : 'dias'} a subir, ${conta.down} a descer, ${conta.flat} sem alteração`);
+    return svg;
+  }
+  function tvTendencia(changes, esc) {
+    const delta = d3.sum(changes, c => c.delta), up = changes.filter(c => tvDir(c.delta) === 'up').length, down = changes.filter(c => tvDir(c.delta) === 'down').length;
+    const s = el('span'); s.append(el('span', null, tvDelta(delta, esc)), ' em ' + changes.length + ' dias · ', el('span', 'tv-up', up + ' a subir'), ', ', el('span', 'tv-down', down + ' a descer'));
+    return s;
+  }
+  const tvBotaoOlho = (chave, esc, nome) => { const b = el('button', 'tv-reveal'); b.type = 'button'; b.dataset.tvreveal = chave; b.setAttribute('aria-pressed', String(!esc)); const l = (esc ? 'Mostrar' : 'Esconder') + ' saldo ' + nome; b.setAttribute('aria-label', l); b.title = l; b.innerHTML = esc ? TV_EYE_OFF : TV_EYE; return b; };
+  function tvDesenha() {
+    if (!TV.aberta) return;
+    tvEscondeDica();
+    const itens = contas(), total = d3.sum(itens, i => i.saldo), chaves = ['__total', ...itens.map(i => i.conta)];
+    const todos = chaves.every(k => TV.revelados.has(k));
+    const ra = $('tv-reveal-all'), la = todos ? 'Esconder todos os saldos' : 'Mostrar todos os saldos';
+    ra.setAttribute('aria-pressed', String(todos)); ra.setAttribute('aria-label', la); ra.title = la; ra.innerHTML = todos ? TV_EYE : TV_EYE_OFF;
+    const hm = x => String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0');
+    $('tv-updated').textContent = S.checked ? 'Atualizado às ' + hm(S.checked) : S.meta ? 'Dados de ' + (new Date(S.meta.modified)).toLocaleDateString('pt-PT') : 'Sem dados';
+    const escT = !TV.revelados.has('__total');
+    $('tv-total').classList.toggle('is-hidden', escT);
+    const acertadas = itens.filter(i => i.acerto).length;
+    $('tv-acertos').textContent = acertadas === itens.length ? 'Todas as contas acertadas com o saldo real' : acertadas ? acertadas + ' de ' + itens.length + ' contas acertadas com o saldo real' : 'Saldos calculados: toca no lápis de cada conta para pores o saldo real';
+    const hh = $('tv-total').querySelector('.tv-hero-head'); hh.replaceChild(tvBotaoOlho('__total', escT, 'total'), hh.querySelector('.tv-reveal'));
+    $('tv-total-amount').textContent = tvEuro(total, escT);
+    const atencao = itens.filter(i => tvEstado(i.saldo)).length, st = tvEstado(total);
+    $('tv-total-meta').replaceChildren(el('span', 'tv-st ' + st, TV_ESTADO[st]), el('span', null, '· ' + itens.length + ' contas' + (atencao ? ' · ' + atencao + ' a precisar de atenção' : '')));
+    const varT = tvVariacoes(null);
+    $('tv-total-trend').replaceChildren(tvBarras(varT, 'o total', escT), tvTendencia(varT, escT));
+    const positivos = d3.sum(itens, i => Math.max(i.saldo, 0)), cor = idx => `var(--s${(idx % 6) + 1})`;
+    const quotas = itens.map(i => positivos > 0 ? Math.max(i.saldo, 0) / positivos : 0);
+    $('tv-stack').replaceChildren(...itens.map((i, idx) => { if (!(quotas[idx] > 0)) return ''; const x = el('i'); x.style.flexGrow = quotas[idx]; x.style.background = cor(idx); x.title = i.conta; return x; }));
+    $('tv-legend').replaceChildren(...itens.map((i, idx) => ({ i, idx, q: quotas[idx] })).sort((a, b) => b.q - a.q).map(({ i, idx, q }) => {
+      const li = el('li'), sw = el('span', 'sw'); sw.style.background = cor(idx); li.append(sw, el('span', 'name', i.conta), el('span', 'val', tvPct.format(q))); return li; }));
+    $('tv-cards').replaceChildren(...itens.map((i, idx) => {
+      const esc = !TV.revelados.has(i.conta), st = tvEstado(i.saldo);
+      const li = el('li', 'tv-row' + (esc ? ' is-hidden' : '')); li.style.setProperty('--c', cor(idx));
+      const tile = el('span', 'tv-tile', tvInicial(i.conta)); tile.setAttribute('aria-hidden', 'true');
+      const txt = el('span', 'tv-text'), sub = el('span', 'tv-sub');
+      sub.append(el('span', 'tv-st ' + st, TV_ESTADO[st]), el('span', null, '· ' + tvPct.format(quotas[idx])));
+      let nota = 'Calculado'; if (i.acerto) { const d = new Date(i.acerto.em); nota = 'Acertado a ' + d.getDate() + ' ' + MES3[d.getMonth()]; }
+      const notaEl = el('span', 'tv-nota' + (i.acerto ? ' ok' : ''), nota);
+      txt.append(el('span', 'tv-name', i.conta), sub, notaEl);
+      const dir = el('span', 'tv-right'); dir.append(el('span', 'tv-value', tvEuro(i.saldo, esc)), tvBarras(tvVariacoes(i.conta), i.conta, esc));
+      const lapis = el('button', 'tv-reveal tv-edit'); lapis.type = 'button'; lapis.setAttribute('aria-label', 'Acertar saldo de ' + i.conta); lapis.title = 'Acertar saldo';
+      lapis.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></svg>';
+      lapis.onclick = e => { e.stopPropagation(); abrirAcerto(i); };
+      const acoes = el('span', 'tv-acoes'); acoes.append(tvBotaoOlho(i.conta, esc, 'de ' + i.conta), lapis);
+      li.append(tile, txt, dir, acoes);
+      return li;
+    }));
+    tvMarcaTab();
+  }
+  function abrirTotal() { TV.aberta = true; $('tv').hidden = false; $('tv').scrollTop = 0; tvDesenha(); }
+  function fecharTotal() { TV.aberta = false; TV.revelados.clear(); $('tv').hidden = true; tvEscondeDica(); }
+  $('abrir-total').addEventListener('click', abrirTotal);
+  $('abrir-total-topo').addEventListener('click', abrirTotal);
+  $('tv-fechar').addEventListener('click', fecharTotal);
+  $('tv-nova-conta').addEventListener('click', () => $('nova-conta').click());
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && TV.aberta) fecharTotal(); });
+  $('tv-reveal-all').addEventListener('click', () => {
+    const chaves = ['__total', ...contas().map(i => i.conta)];
+    if (chaves.every(k => TV.revelados.has(k))) TV.revelados.clear(); else chaves.forEach(k => TV.revelados.add(k));
+    tvDesenha();
+  });
+  $('tv').addEventListener('click', e => {
+    const b = e.target.closest('[data-tvreveal]');
+    if (b) { const k = b.dataset.tvreveal; TV.revelados.has(k) ? TV.revelados.delete(k) : TV.revelados.add(k); tvDesenha();
+      const de = [...$('tv').querySelectorAll('[data-tvreveal]')].find(x => x.dataset.tvreveal === k); if (de) de.focus(); return; }
+    const svg = e.target.closest('.tv-spark'); if (svg) tvMostraDica(svg, e.clientX, true); else tvEscondeDica();
+  });
+  let tvTimer = null, tvHover = false;
+  function tvEscondeDica() { $('tv-tip').classList.remove('show'); $('tv').querySelectorAll('.tv-spark.has-active').forEach(s => { s.classList.remove('has-active'); s.querySelectorAll('rect.active').forEach(r => r.classList.remove('active')); }); }
+  function tvMostraDica(svg, x, auto) {
+    const bars = [...svg.querySelectorAll('rect[data-tip]')]; if (!bars.length) return;
+    let best = bars[0], dist = Infinity;
+    for (const b of bars) { const r = b.getBoundingClientRect(), d = Math.abs(r.left + r.width / 2 - x); if (d < dist) { dist = d; best = b; } }
+    tvEscondeDica(); svg.classList.add('has-active'); best.classList.add('active');
+    const tip = $('tv-tip'); tip.textContent = best.dataset.tip; tip.classList.add('show');
+    const br = best.getBoundingClientRect(), sr = svg.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = Math.min(Math.max(8, br.left + br.width / 2 - tw / 2), window.innerWidth - tw - 8) + 'px';
+    tip.style.top = (sr.top - th - 8 > 8 ? sr.top - th - 8 : sr.bottom + 8) + 'px';
+    clearTimeout(tvTimer); tvHover = !auto; if (auto) tvTimer = setTimeout(tvEscondeDica, 3000);
+  }
+  $('tv').addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; const s = e.target.closest('.tv-spark'); if (s) tvMostraDica(s, e.clientX, false); else if (tvHover) tvEscondeDica(); });
+  const tvTabs = [...document.querySelectorAll('.tv-tab')];
+  function tvMarcaTab() {
+    const tv = $('tv'), linha = window.innerHeight * 0.4; let atual = 'tv-total';
+    for (const t of tvTabs) { const sec = $(t.dataset.section); if (sec && sec.getBoundingClientRect().top < linha) atual = t.dataset.section; }
+    if (tv.scrollTop + tv.clientHeight >= tv.scrollHeight - 4) atual = tvTabs[tvTabs.length - 1].dataset.section;
+    for (const t of tvTabs) t.setAttribute('aria-current', String(t.dataset.section === atual));
+  }
+  $('tv').addEventListener('scroll', () => { tvEscondeDica(); tvMarcaTab(); }, { passive: true });
+  tvTabs.forEach(t => t.addEventListener('click', e => { e.preventDefault(); const sec = $(t.dataset.section); if (sec) $('tv').scrollTo({ top: sec.offsetTop - 12, behavior: reduce ? 'auto' : 'smooth' }); }));
 
   // 5. Editor de grupos
   const NOMES_G = Object.keys(GRUPOS).filter(g => g !== 'Rendimentos' && g !== 'Dinheiro').concat(['Rendimentos', 'Dinheiro', 'Outros']);
