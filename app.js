@@ -189,7 +189,7 @@
   const MAN_KEY = 'saldo.manuais';
   const normaliza = o => {
     o = o && typeof o === 'object' ? o : {};
-    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [] };
+    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {} };
   };
   let M = normaliza((() => { try { return JSON.parse(store.get(MAN_KEY) || 'null'); } catch (e) { return null; } })());
   const manFile = () => folder() + '/manuais.json';
@@ -279,9 +279,13 @@
 
   function contas() {
     const m = d3.rollup(S.rows, v => d3.sum(v, r => r.montante), r => r.conta);
+    for (const c of M.contas.concat(Object.keys(M.saldos))) if (!m.has(c)) m.set(c, 0);
     const ORDEM = [/^activobank$/i, /^revolut/i, /^c\.?\s*c\.?\s*activobank|activobank\s*c\.?\s*c/i, /wizink/i, /^dinheiro/i, /alimenta/i];
     const pos = c => { const i = ORDEM.findIndex(re => re.test(c)); return i < 0 ? 99 : i; };
-    return [...m].map(([conta, saldo]) => ({ conta, saldo })).sort((a, b) => pos(a.conta) - pos(b.conta) || a.conta.localeCompare(b.conta, 'pt'));
+    return [...m].map(([conta, calc]) => {
+      const a = M.saldos[conta];
+      return { conta, calc, saldo: a ? calc + (+a.real - +a.calc) : calc, acerto: a || null };
+    }).sort((a, b) => pos(a.conta) - pos(b.conta) || a.conta.localeCompare(b.conta, 'pt'));
   }
 
   const set = patch => { Object.assign(S, patch); render(); };
@@ -428,12 +432,23 @@
   }
 
   function drawTiles(cs) {
+    const total = d3.sum(cs, r => r.saldo), acertadas = cs.filter(r => r.acerto).length;
+    $('total-contas').textContent = eur(total);
+    $('total-contas').style.color = total < 0 ? '#FF453A' : '';
+    $('total-nota').textContent = acertadas === cs.length ? 'Todas as contas acertadas com o saldo real' : acertadas ? acertadas + ' de ' + cs.length + ' contas acertadas com o saldo real' : 'Saldos calculados: toca no lápis de cada conta para pores o saldo real';
     $('tiles').replaceChildren(...cs.map((r, i) => {
-      const b = el('button', 'tile' + (S.conta === r.conta ? ' on' : '')); b.type = 'button';
+      const t = el('div', 'tile' + (S.conta === r.conta ? ' on' : ''));
+      const b = el('button', 'tile-main'); b.type = 'button'; b.setAttribute('aria-pressed', S.conta === r.conta);
       b.onclick = () => set({ conta: S.conta === r.conta ? '' : r.conta });
       const ic = el('div', 'tile-ico', ico(r.conta)); ic.style.background = COLORS[i % COLORS.length];
       const v = el('div', 'tile-val', eur(r.saldo)); if (r.saldo < 0) v.style.color = '#FF453A';
-      b.append(ic, el('div', 'tile-name', r.conta), v); return b;
+      let nota = 'Calculado';
+      if (r.acerto) { const d = new Date(r.acerto.em); nota = 'Acertado a ' + d.getDate() + ' ' + MES3[d.getMonth()]; }
+      b.append(ic, el('div', 'tile-name', r.conta), v, el('div', 'tile-nota' + (r.acerto ? ' ok' : ''), nota));
+      const e = el('button', 'tile-edit'); e.type = 'button'; e.setAttribute('aria-label', 'Acertar saldo de ' + r.conta);
+      e.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      e.onclick = () => abrirAcerto(r);
+      t.append(b, e); return t;
     }));
   }
 
@@ -771,6 +786,34 @@
 
   // 2. Botão + abre o formulário já com o teclado
   $('fab').addEventListener('click', () => { abrirForm(null); C = ''; abrirCalc(); fDesenha(); });
+
+
+  // Acertar o saldo real de uma conta
+  let acertoConta = null;
+  function abrirAcerto(r) {
+    acertoConta = r;
+    $('a-titulo').textContent = r.conta;
+    $('a-calc').textContent = eur(r.calc);
+    $('a-valor').value = r.acerto ? L.format(',.2f')(r.saldo).replace(/\u00a0/g, '') : '';
+    $('a-remover').hidden = !r.acerto; $('a-msg').textContent = '';
+    abrir('sh-acerto');
+    if (window.matchMedia('(pointer:fine)').matches) $('a-valor').focus();
+  }
+  $('a-ok').addEventListener('click', () => {
+    const txt = $('a-valor').value.replace(/\s/g, '').replace(/−/g, '-');
+    const v = parseFloat(/,/.test(txt) ? txt.replace(/\.(?=\d{3})/g, '').replace(',', '.') : txt);
+    if (!isFinite(v)) { $('a-msg').textContent = 'Escreve o saldo que a app do banco mostra, por exemplo 1234,56.'; return; }
+    M.saldos[acertoConta.conta] = { real: Math.round(v * 100) / 100, calc: Math.round(acertoConta.calc * 100) / 100, em: new Date().toISOString() };
+    if (!S.rows.some(r => r.conta === acertoConta.conta) && !M.contas.includes(acertoConta.conta)) M.contas.push(acertoConta.conta);
+    fechar('sh-acerto'); saveManuais('Saldo de ' + acertoConta.conta + ' acertado');
+  });
+  $('a-remover').addEventListener('click', () => { delete M.saldos[acertoConta.conta]; fechar('sh-acerto'); saveManuais('Acerto removido'); });
+  $('nova-conta').addEventListener('click', () => {
+    const nome = (window.prompt('Nome da conta nova (por exemplo, Dinheiro):') || '').trim();
+    if (!nome) return;
+    if (contas().some(c => c.conta.toLowerCase() === nome.toLowerCase())) { toast('Essa conta já existe.', true); return; }
+    abrirAcerto({ conta: nome, calc: 0, saldo: 0, acerto: null });
+  });
 
   // 5. Editor de grupos
   const NOMES_G = Object.keys(GRUPOS).filter(g => g !== 'Rendimentos' && g !== 'Dinheiro').concat(['Rendimentos', 'Dinheiro', 'Outros']);
