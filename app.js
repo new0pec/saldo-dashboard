@@ -455,7 +455,7 @@
     $('tiles').replaceChildren(...cs.map((r, i) => {
       const t = el('div', 'tile' + (S.conta === r.conta ? ' on' : ''));
       const b = el('button', 'tile-main'); b.type = 'button'; b.setAttribute('aria-pressed', S.conta === r.conta);
-      b.onclick = () => set({ conta: S.conta === r.conta ? '' : r.conta });
+      b.onclick = () => verConta(S.conta === r.conta ? '' : r.conta);
       const ic = el('div', 'tile-ico', ico(r.conta)); ic.style.background = COLORS[i % COLORS.length];
       const v = el('div', 'tile-val', eur(r.saldo)); if (r.saldo < 0) v.style.color = '#FF453A';
       let nota = 'Calculado';
@@ -468,10 +468,16 @@
     }));
   }
 
+  // Tocar numa conta: a lista de movimentos mostra só essa conta
+  function verConta(conta) {
+    set({ conta, categoria: '', grupo: '' });
+    if (conta) { fecharLinhas(); const lst = $('lista'); if (lst) lst.scrollTop = 0; $('movimentos').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }
+  }
   function drawList() {
-    const fc = $('filtroCat');
-    if (S.categoria) { const b = el('button', 'filter', S.categoria + '  ×'); b.type = 'button'; b.onclick = () => set({ categoria: '' }); fc.replaceChildren(b); }
-    else fc.replaceChildren();
+    const fc = $('filtroCat'), chips = [];
+    if (S.conta) { const b = el('button', 'filter', S.conta + '  ×'); b.type = 'button'; b.setAttribute('aria-label', 'Mostrar movimentos de todas as contas'); b.onclick = () => set({ conta: '' }); chips.push(b); }
+    if (S.categoria) { const b = el('button', 'filter', S.categoria + '  ×'); b.type = 'button'; b.onclick = () => set({ categoria: '' }); chips.push(b); }
+    fc.replaceChildren(...chips);
     const q = S.q.trim().toLowerCase();
     let rows = S.rows.filter(r => (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano) && (!S.conta || r.conta === S.conta) && (!S.grupo || r.grupo === S.grupo) && (!S.categoria || r.categoria === S.categoria)
       && (!q || (r.categoria + ' ' + r.etiquetas + ' ' + r.conta + ' ' + r.grupo).toLowerCase().includes(q)));
@@ -917,6 +923,10 @@
       lapis.onclick = e => { e.stopPropagation(); abrirAcerto(i); };
       const acoes = el('span', 'tv-acoes'); acoes.append(tvBotaoOlho(i.conta, esc, 'de ' + i.conta), lapis);
       li.append(tile, txt, dir, acoes);
+      li.classList.add('tv-click'); li.tabIndex = 0; li.setAttribute('aria-label', 'Ver movimentos de ' + i.conta);
+      const ir = () => { fecharTotal(); verConta(i.conta); };
+      li.addEventListener('click', e => { if (!e.target.closest('button, .tv-spark')) ir(); });
+      li.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === li) { e.preventDefault(); ir(); } });
       return li;
     }));
     tvMarcaTab();
