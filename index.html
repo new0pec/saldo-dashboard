@@ -340,6 +340,17 @@ button,input,select{font:inherit;color:inherit}
 .tv-click{cursor:pointer}
 .tv-click:active{background:var(--t-fill)}
 #filtroCat{display:flex;gap:6px;flex-wrap:wrap}
+.ch-acoes{display:flex;align-items:center;gap:10px}
+.capa-img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
+.com-capa{padding:0!important;overflow:hidden;border:0!important}
+.fo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:10px;max-height:65vh;overflow-y:auto;padding:2px}
+.fo-item{aspect-ratio:1;border-radius:16px;border:0;padding:0;overflow:hidden;cursor:pointer;background:color-mix(in srgb,var(--fg) 8%,transparent);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--muted)}
+.fo-item img{width:100%;height:100%;object-fit:cover}
+.fo-item.on{box-shadow:0 0 0 3px #0A84FF}
+.fo-item.a-carregar{animation:foPulse 1.2s ease-in-out infinite}
+@keyframes foPulse{50%{opacity:.5}}
+.fo-sem{border:2px dashed var(--line)}
+#sh-capas,#sh-fotos{z-index:50}
 [hidden]{display:none!important}
 @media (max-width:520px){.title{font-size:34px}.hero-num{font-size:38px}.ring{width:124px;height:124px}}
 @media (prefers-reduced-motion:no-preference){.card,.tile{animation:in .5s cubic-bezier(.2,.8,.2,1) both}@keyframes in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}}
@@ -404,7 +415,7 @@ button,input,select{font:inherit;color:inherit}
     </section>
 
     <section class="card" id="categorias">
-      <div class="card-head"><h2>Categorias</h2><span id="filtroGrupo"></span></div>
+      <div class="card-head"><h2>Categorias</h2><span class="ch-acoes"><span id="filtroGrupo"></span><button type="button" class="link" id="abrir-capas">Capas</button></span></div>
       <div class="cats" id="cats"></div>
     </section>
 
@@ -509,6 +520,21 @@ button,input,select{font:inherit;color:inherit}
     </div>
     <p class="msg" id="a-msg" role="alert"></p>
     <button type="button" class="mf-del" id="a-remover" hidden>Voltar ao saldo calculado</button>
+  </div>
+</div>
+
+<div class="sheet-wrap" id="sh-capas" hidden>
+  <div class="sheet glass mf" role="dialog" aria-modal="true" aria-label="Capas das categorias">
+    <div class="mf-top"><button type="button" class="link" data-close>Fechar</button><b>Capas</b><span></span></div>
+    <p class="hint">Escolhe uma foto da pasta <b>Photos</b> no Dropbox para cada categoria. Aparece nas categorias, nos movimentos e no teclado.</p>
+    <div class="mf-card plist" id="cp-list"></div>
+  </div>
+</div>
+<div class="sheet-wrap" id="sh-fotos" hidden>
+  <div class="sheet glass mf" role="dialog" aria-modal="true" aria-labelledby="fo-title">
+    <div class="mf-top"><button type="button" class="link" data-close>Voltar</button><b id="fo-title">Capa</b><span></span></div>
+    <p class="msg" id="fo-msg" role="status"></p>
+    <div class="fo-grid" id="fo-grid"></div>
   </div>
 </div>
 

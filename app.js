@@ -193,7 +193,7 @@
   const MAN_KEY = 'saldo.manuais';
   const normaliza = o => {
     o = o && typeof o === 'object' ? o : {};
-    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {} };
+    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {}, capas: o.capas && typeof o.capas === 'object' ? o.capas : {} };
   };
   function migraNomes(o) {
     o.movimentos.forEach(m => { if (m) m.conta = nomeConta(m.conta); });
@@ -442,7 +442,7 @@
       const tr = el('div', 'cat-track'), fl = el('div', 'cat-fill'); fl.style.width = (r.total / max * 100) + '%'; fl.style.background = gcol(r.grupo); tr.append(fl);
       mid.append(el('div', 'cat-name', r.nome), tr);
       const val = el('div', 'cat-val'); val.append(el('span', null, eur(r.total)), el('small', null, r.quota + '% das despesas'));
-      const ci = el('div', 'cat-ico', ico(r.nome)); ci.style.background = gcol(r.grupo);
+      const ci = el('div', 'cat-ico', ico(r.nome)); ci.style.background = gcol(r.grupo); aplicaCapa(ci, r.nome);
       b.append(ci, mid, val); return b;
     }));
   }
@@ -489,7 +489,7 @@
       if (r.data !== last) { out.push(el('li', 'txhead', fmtD(r.data))); last = r.data; }
       const li = el('li', 'tx-wrap'), row = el('div', 'tx'), mid = el('div'); mid.style.minWidth = '0';
       mid.append(el('div', 'tx-t', r.categoria), el('div', 'tx-s', [r.manual ? (r.serie ? 'Manual · repete' : 'Manual') : '', r.grupo, r.etiquetas, r.conta].filter(Boolean).join(' · ')));
-      const ti = el('div', 'tx-ico', ico(r.categoria)); ti.style.background = gcol(r.grupo);
+      const ti = el('div', 'tx-ico', ico(r.categoria)); ti.style.background = gcol(r.grupo); aplicaCapa(ti, r.categoria);
       row.append(ti, mid, el('div', 'tx-v' + (r.tipo === 'Transferência' ? ' mov' : r.montante > 0 ? ' pos' : ''), (r.montante > 0 ? '+' : '') + eur(r.montante)));
       const act = el('div', 'tx-act');
       const bR = el('button', 'a-rep', 'Repetir'); bR.type = 'button'; bR.onclick = () => repetir(r);
@@ -533,6 +533,7 @@
     try {
       const res = await latestFromDropbox();
       let manMudou = false; try { manMudou = await loadManuais(); } catch (e) {}
+      carregaCapas();
       S.checked = new Date();
       const mudou = !S.meta || S.meta.name !== res.name || S.meta.modified !== res.modified || S.rows.length === 0 || !auto;
       if (mudou) useData(res, true); else { if (manMudou) { compose(); render(); } showSource(S.meta); }
@@ -651,7 +652,8 @@
     $('f-etq').textContent = F.etiquetas || 'Sem';
     $('f-rep').textContent = REP[F.repetir || 'nunca'];
     const ic = $('f-cat-ico');
-    if (F.categoria) { ic.textContent = ico(F.categoria); ic.style.background = gcol(grupoDe(F.categoria, F.etiquetas, F.tipo)); ic.classList.add('cheio'); }
+    ic.classList.remove('com-capa');
+    if (F.categoria) { ic.textContent = ico(F.categoria); ic.style.background = gcol(grupoDe(F.categoria, F.etiquetas, F.tipo)); ic.classList.add('cheio'); aplicaCapa(ic, F.categoria); }
     else { ic.textContent = ''; ic.style.background = ''; ic.classList.remove('cheio'); }
   }
   $('f-tipo').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { F.tipo = b.dataset.v; fDesenha(); }));
@@ -688,7 +690,7 @@
     let ops = P.opcoes.filter(o => !ql || o.label.toLowerCase().includes(ql));
     const linhas = ops.map(o => {
       const b = el('button', 'mf-row'); b.type = 'button';
-      const i = el('span', 'mf-ico', o.ini || ico(o.label)); i.style.background = o.cor || '#8E8E93';
+      const i = el('span', 'mf-ico', o.ini || ico(o.label)); i.style.background = o.cor || '#8E8E93'; if (P && P.titulo === 'Categoria') aplicaCapa(i, o.v);
       b.append(i, el('span', 'mf-lab', o.label));
       if (P.sel.has(o.v)) b.append(el('span', 'p-check', '✓'));
       b.onclick = () => escolhe(o.v);
@@ -778,7 +780,7 @@
     if (F.categoria && !cats.includes(F.categoria)) cats.unshift(F.categoria);
     $('c-strip').replaceChildren(...cats.map(c => {
       const b = el('button', 'c-cat' + (F.categoria === c ? ' on' : '')); b.type = 'button'; b.setAttribute('aria-label', c); b.setAttribute('aria-pressed', F.categoria === c);
-      const t = el('span', 'c-tile', abrev(c)); t.style.background = gcol(grupoDe(c, '', F.tipo));
+      const t = el('span', 'c-tile', abrev(c)); t.style.background = gcol(grupoDe(c, '', F.tipo)); aplicaCapa(t, c);
       b.append(t, el('span', 'c-nome', c)); b.onclick = () => { F.categoria = c; fDesenha(); };
       return b;
     }));
@@ -972,6 +974,90 @@
   }
   $('tv').addEventListener('scroll', () => { tvEscondeDica(); tvMarcaTab(); }, { passive: true });
   tvTabs.forEach(t => t.addEventListener('click', e => { e.preventDefault(); const sec = $(t.dataset.section); if (sec) $('tv').scrollTo({ top: sec.offsetTop - 12, behavior: reduce ? 'auto' : 'smooth' }); }));
+
+  // ---------- Capas das categorias (imagens da pasta Photos no Dropbox) ----------
+  const CAPA_KEY = 'saldo.capas.cache';
+  const fotosPasta = () => folder() + '/Photos';
+  let capaCache = (() => { try { return JSON.parse(store.get(CAPA_KEY) || '{}'); } catch (e) { return {}; } })();
+  const guardaCapaCache = () => { try { store.set(CAPA_KEY, JSON.stringify(capaCache)); } catch (e) { capaCache = {}; } };
+  const capaDe = cat => { const p = M.capas && M.capas[cat]; return p && capaCache[p.toLowerCase()] || null; };
+  // Põe a capa (se houver) dentro de um ícone; senão deixa a inicial colorida
+  function aplicaCapa(elIco, cat) {
+    const url = capaDe(cat); if (!url) return elIco;
+    const img = document.createElement('img'); img.src = url; img.alt = ''; img.className = 'capa-img';
+    elIco.replaceChildren(img); elIco.classList.add('com-capa'); elIco.style.background = 'transparent';
+    return elIco;
+  }
+  async function miniaturas(paths) {
+    const out = {};
+    for (let i = 0; i < paths.length; i += 25) {
+      const lote = paths.slice(i, i + 25);
+      const r = await dbx('https://content.dropboxapi.com/2/files/get_thumbnail_batch', { headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries: lote.map(path => ({ path, format: 'png', size: 'w128h128', mode: 'fitone_bestfit' })) }) });
+      const j = await r.json();
+      (j.entries || []).forEach((e, k) => { if (e['.tag'] === 'success' && e.thumbnail) out[lote[k].toLowerCase()] = 'data:image/png;base64,' + e.thumbnail; });
+    }
+    return out;
+  }
+  async function carregaCapas() {
+    if (!ligado() || !M.capas) return;
+    const falta = [...new Set(Object.values(M.capas))].filter(p => p && !capaCache[p.toLowerCase()]);
+    if (!falta.length) return;
+    try { Object.assign(capaCache, await miniaturas(falta)); guardaCapaCache(); render(); } catch (e) {}
+  }
+  let fotosLista = null, fotosThumbs = {};
+  async function carregaFotos() {
+    if (fotosLista) return fotosLista;
+    let r = await listFolder(fotosPasta()); let j = await r.json(), entradas = j.entries;
+    while (j.has_more) { r = await dbx('https://api.dropboxapi.com/2/files/list_folder/continue', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cursor: j.cursor }) }); j = await r.json(); entradas = entradas.concat(j.entries); }
+    fotosLista = entradas.filter(e => e['.tag'] === 'file' && /\.(png|jpe?g|heic|webp|gif)$/i.test(e.name)).sort((a, b) => String(b.client_modified).localeCompare(String(a.client_modified)));
+    return fotosLista;
+  }
+  // Lista de categorias para escolher capa
+  function abrirCapas() {
+    const cont = new Map(); for (const r of S.rows) if (r.tipo !== 'Transferência') cont.set(r.categoria, (cont.get(r.categoria) || 0) + 1);
+    const cats = [...cont].sort((a, b) => b[1] - a[1]).map(x => x[0]);
+    $('cp-list').replaceChildren(...cats.map(c => {
+      const b = el('button', 'mf-row'); b.type = 'button';
+      const t = el('span', 'mf-ico', ico(c)); t.style.background = gcol(grupoDe(c, '', 'Despesa')); t.style.color = '#fff'; t.style.fontWeight = '700'; aplicaCapa(t, c);
+      b.append(t, el('span', 'mf-lab', c), el('span', 'mf-val', M.capas && M.capas[c] ? 'Com capa' : 'Sem capa'), el('span', 'mf-chev', '›'));
+      b.onclick = () => abrirFotos(c);
+      return b;
+    }));
+    abrir('sh-capas');
+  }
+  async function abrirFotos(cat) {
+    $('fo-title').textContent = 'Capa de ' + cat; $('fo-msg').textContent = '';
+    const grelha = $('fo-grid'); grelha.replaceChildren(); abrir('sh-fotos');
+    const sem = el('button', 'fo-item fo-sem', 'Sem capa'); sem.type = 'button';
+    sem.onclick = () => { if (M.capas) delete M.capas[cat]; fechar('sh-fotos'); abrirCapas(); saveManuais('Capa removida'); };
+    grelha.append(sem);
+    if (!ligado()) { $('fo-msg').textContent = 'Liga o Dropbox nas definições para veres as fotos.'; return; }
+    let fotos;
+    try { fotos = await carregaFotos(); } catch (e) { $('fo-msg').textContent = /not_found/.test(e.summary || '') ? 'Não encontrei a pasta ' + fotosPasta() + '. Cria-a no Dropbox e põe lá as fotos.' : e.message; return; }
+    if (!fotos.length) { $('fo-msg').textContent = 'A pasta ' + fotosPasta() + ' não tem imagens.'; return; }
+    const atual = M.capas && M.capas[cat];
+    const botoes = fotos.map(f => {
+      const b = el('button', 'fo-item' + (atual && atual.toLowerCase() === f.path_lower ? ' on' : '')); b.type = 'button'; b.setAttribute('aria-label', f.name);
+      const url = fotosThumbs[f.path_lower] || capaCache[f.path_lower];
+      if (url) { const im = document.createElement('img'); im.src = url; im.alt = ''; b.append(im); } else b.classList.add('a-carregar');
+      b.onclick = () => {
+        M.capas = M.capas || {}; M.capas[cat] = f.path_display;
+        const u = fotosThumbs[f.path_lower]; if (u) { capaCache[f.path_lower] = u; guardaCapaCache(); }
+        fechar('sh-fotos'); abrirCapas(); saveManuais('Capa de ' + cat + ' guardada'); carregaCapas();
+      };
+      b.dataset.p = f.path_lower; return b;
+    });
+    grelha.append(...botoes);
+    const falta = fotos.filter(f => !fotosThumbs[f.path_lower]).map(f => f.path_display);
+    for (let i = 0; i < falta.length; i += 25) {
+      try {
+        const t = await miniaturas(falta.slice(i, i + 25)); Object.assign(fotosThumbs, t);
+        for (const [p, u] of Object.entries(t)) { const b = grelha.querySelector('[data-p="' + CSS.escape(p) + '"]'); if (b) { const im = document.createElement('img'); im.src = u; im.alt = ''; b.replaceChildren(im); b.classList.remove('a-carregar'); } }
+      } catch (e) { $('fo-msg').textContent = 'Algumas fotos não carregaram: ' + e.message; break; }
+    }
+  }
+  $('abrir-capas').addEventListener('click', abrirCapas);
 
   // 5. Editor de grupos
   const NOMES_G = Object.keys(GRUPOS).filter(g => g !== 'Rendimentos' && g !== 'Dinheiro').concat(['Rendimentos', 'Dinheiro', 'Outros']);
