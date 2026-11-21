@@ -193,7 +193,7 @@
   const MAN_KEY = 'saldo.manuais';
   const normaliza = o => {
     o = o && typeof o === 'object' ? o : {};
-    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {}, capas: o.capas && typeof o.capas === 'object' ? o.capas : {} };
+    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {}, capas: o.capas && typeof o.capas === 'object' ? o.capas : {}, limites: o.limites && typeof o.limites === 'object' ? o.limites : {} };
   };
   function migraNomes(o) {
     o.movimentos.forEach(m => { if (m) m.conta = nomeConta(m.conta); });
@@ -292,6 +292,8 @@
     return out.map(x => ({ ...x, quota: tot ? Math.round(x.total / tot * 100) : 0 }));
   }
 
+  // Limite de descoberto (Conta Ordenado do ActivoBank: 500 €)
+  const LIMITE_PADRAO = { 'ActivoBank': 500 };
   function contas() {
     const m = d3.rollup(S.rows, v => d3.sum(v, r => r.montante), r => r.conta);
     for (const c of M.contas.concat(Object.keys(M.saldos))) if (!m.has(c)) m.set(c, 0);
@@ -299,7 +301,9 @@
     const pos = c => { const i = ORDEM.findIndex(re => re.test(c)); return i < 0 ? 99 : i; };
     return [...m].map(([conta, calc]) => {
       const a = M.saldos[conta];
-      return { conta, calc, saldo: a ? calc + (+a.real - +a.calc) : calc, acerto: a || null };
+      const saldo = a ? calc + (+a.real - +a.calc) : calc;
+      const lim = M.limites && M.limites[conta] != null ? +M.limites[conta] : (LIMITE_PADRAO[conta] || 0);
+      return { conta, calc, saldo, acerto: a || null, limite: lim, disponivel: saldo + lim, usado: lim > 0 ? Math.min(lim, Math.max(0, -saldo)) : 0 };
     }).sort((a, b) => pos(a.conta) - pos(b.conta) || a.conta.localeCompare(b.conta, 'pt'));
   }
 
@@ -451,16 +455,30 @@
     const total = d3.sum(cs, r => r.saldo), acertadas = cs.filter(r => r.acerto).length;
     $('total-contas').textContent = eur(total);
     $('total-contas').style.color = total < 0 ? '#FF453A' : '';
+    const comLim = cs.filter(r => r.limite > 0);
+    $('total-limite').hidden = !comLim.length;
+    if (comLim.length) $('total-limite').textContent = comLim.map(r => r.conta + ': ainda podes usar ' + eur(Math.max(0, r.disponivel)) + (r.usado > 0 ? ' (já usaste ' + eur(r.usado) + ' dos ' + eur(r.limite) + ' da Conta Ordenado)' : ' (Conta Ordenado por usar)')).join(' · ');
     $('total-nota').textContent = acertadas === cs.length ? 'Todas as contas acertadas com o saldo real' : acertadas ? acertadas + ' de ' + cs.length + ' contas acertadas com o saldo real' : 'Saldos calculados: toca no lápis de cada conta para pores o saldo real';
     $('tiles').replaceChildren(...cs.map((r, i) => {
       const t = el('div', 'tile' + (S.conta === r.conta ? ' on' : ''));
       const b = el('button', 'tile-main'); b.type = 'button'; b.setAttribute('aria-pressed', S.conta === r.conta);
       b.onclick = () => verConta(S.conta === r.conta ? '' : r.conta);
       const ic = el('div', 'tile-ico', ico(r.conta)); ic.style.background = COLORS[i % COLORS.length];
-      const v = el('div', 'tile-val', eur(r.saldo)); if (r.saldo < 0) v.style.color = '#FF453A';
       let nota = 'Calculado';
       if (r.acerto) { const d = new Date(r.acerto.em); nota = 'Acertado a ' + d.getDate() + ' ' + MES3[d.getMonth()]; }
-      b.append(ic, el('div', 'tile-name', r.conta), v, el('div', 'tile-nota' + (r.acerto ? ' ok' : ''), nota));
+      if (r.limite > 0) {
+        const v = el('div', 'tile-val', eur(r.disponivel)); if (r.disponivel < 0) v.style.color = '#FF453A';
+        const fr = r.usado / r.limite, cor = fr >= 0.85 ? '#FF453A' : fr >= 0.5 ? '#FF9F0A' : '#30D158';
+        const barra = el('div', 'lim-bar'); barra.setAttribute('role', 'img'); barra.setAttribute('aria-label', 'Usado ' + eur(r.usado) + ' de ' + eur(r.limite) + ' da Conta Ordenado');
+        const fill = el('i'); fill.style.width = Math.min(100, fr * 100) + '%'; fill.style.background = cor; barra.append(fill);
+        const sv = el('div', 'tile-saldo'); sv.append('Saldo ', Object.assign(el('b', null, eur(r.saldo)), { style: r.saldo < 0 ? 'color:#FF453A' : '' }));
+        b.append(ic, el('div', 'tile-name', r.conta), el('div', 'tile-lab', 'Disponível'), v, sv, barra,
+          el('div', 'tile-lim', r.usado > 0 ? 'Usado ' + eur(r.usado) + ' de ' + eur(r.limite) + ' (Conta Ordenado)' : 'Conta Ordenado de ' + eur(r.limite) + ' por usar'),
+          el('div', 'tile-nota' + (r.acerto ? ' ok' : ''), nota));
+      } else {
+        const v = el('div', 'tile-val', eur(r.saldo)); if (r.saldo < 0) v.style.color = '#FF453A';
+        b.append(ic, el('div', 'tile-name', r.conta), v, el('div', 'tile-nota' + (r.acerto ? ' ok' : ''), nota));
+      }
       const e = el('button', 'tile-edit'); e.type = 'button'; e.setAttribute('aria-label', 'Acertar saldo de ' + r.conta);
       e.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       e.onclick = () => abrirAcerto(r);
@@ -820,12 +838,18 @@
     $('a-calc').textContent = eur(r.calc);
     $('a-valor').value = r.acerto ? L.format(',.2f')(r.saldo).replace(/\u00a0/g, '') : '';
     $('a-remover').hidden = !r.acerto; $('a-msg').textContent = '';
+    $('a-limite').value = r.limite ? L.format(',.2f')(r.limite).replace(/\u00a0/g, '') : '';
     abrir('sh-acerto');
     if (window.matchMedia('(pointer:fine)').matches) $('a-valor').focus();
   }
   $('a-ok').addEventListener('click', () => {
     const txt = $('a-valor').value.replace(/\s/g, '').replace(/−/g, '-');
     const v = parseFloat(/,/.test(txt) ? txt.replace(/\.(?=\d{3})/g, '').replace(',', '.') : txt);
+    const lt = $('a-limite').value.replace(/\s/g, '');
+    const lim = lt ? parseFloat(/,/.test(lt) ? lt.replace(/\.(?=\d{3})/g, '').replace(',', '.') : lt) : 0;
+    if (lt && !(lim >= 0)) { $('a-msg').textContent = 'O limite tem de ser um número, por exemplo 500.'; return; }
+    M.limites = M.limites || {}; M.limites[acertoConta.conta] = Math.round(lim * 100) / 100;
+    if (!txt) { fechar('sh-acerto'); saveManuais('Limite de ' + acertoConta.conta + ' guardado'); return; }
     if (!isFinite(v)) { $('a-msg').textContent = 'Escreve o saldo que a app do banco mostra, por exemplo 1234,56.'; return; }
     M.saldos[acertoConta.conta] = { real: Math.round(v * 100) / 100, calc: Math.round(acertoConta.calc * 100) / 100, em: new Date().toISOString() };
     if (!S.rows.some(r => r.conta === acertoConta.conta) && !M.contas.includes(acertoConta.conta)) M.contas.push(acertoConta.conta);
@@ -898,10 +922,13 @@
     const escT = !TV.revelados.has('__total');
     $('tv-total').classList.toggle('is-hidden', escT);
     const acertadas = itens.filter(i => i.acerto).length;
+    const limTv = itens.filter(i => i.limite > 0);
+    $('tv-limite').hidden = !limTv.length;
+    if (limTv.length) $('tv-limite').textContent = limTv.map(i => 'Conta Ordenado ' + i.conta + ': ainda podes usar ' + tvEuro(Math.max(0, i.disponivel), escT) + ' de ' + tvEuro(i.limite, escT)).join(' · ');
     $('tv-acertos').textContent = acertadas === itens.length ? 'Todas as contas acertadas com o saldo real' : acertadas ? acertadas + ' de ' + itens.length + ' contas acertadas com o saldo real' : 'Saldos calculados: toca no lápis de cada conta para pores o saldo real';
     const hh = $('tv-total').querySelector('.tv-hero-head'); hh.replaceChild(tvBotaoOlho('__total', escT, 'total'), hh.querySelector('.tv-reveal'));
     $('tv-total-amount').textContent = tvEuro(total, escT);
-    const atencao = itens.filter(i => tvEstado(i.saldo)).length, st = tvEstado(total);
+    const atencao = itens.filter(i => tvEstado(i.disponivel)).length, st = tvEstado(total);
     $('tv-total-meta').replaceChildren(el('span', 'tv-st ' + st, TV_ESTADO[st]), el('span', null, '· ' + itens.length + ' contas' + (atencao ? ' · ' + atencao + ' a precisar de atenção' : '')));
     const varT = tvVariacoes(null);
     $('tv-total-trend').replaceChildren(tvBarras(varT, 'o total', escT), tvTendencia(varT, escT));
@@ -911,11 +938,12 @@
     $('tv-legend').replaceChildren(...itens.map((i, idx) => ({ i, idx, q: quotas[idx] })).sort((a, b) => b.q - a.q).map(({ i, idx, q }) => {
       const li = el('li'), sw = el('span', 'sw'); sw.style.background = cor(idx); li.append(sw, el('span', 'name', i.conta), el('span', 'val', tvPct.format(q))); return li; }));
     $('tv-cards').replaceChildren(...itens.map((i, idx) => {
-      const esc = !TV.revelados.has(i.conta), st = tvEstado(i.saldo);
+      const esc = !TV.revelados.has(i.conta), st = tvEstado(i.disponivel);
       const li = el('li', 'tv-row' + (esc ? ' is-hidden' : '')); li.style.setProperty('--c', cor(idx));
       const tile = el('span', 'tv-tile', tvInicial(i.conta)); tile.setAttribute('aria-hidden', 'true');
       const txt = el('span', 'tv-text'), sub = el('span', 'tv-sub');
       sub.append(el('span', 'tv-st ' + st, TV_ESTADO[st]), el('span', null, '· ' + tvPct.format(quotas[idx])));
+      if (i.limite > 0) sub.append(el('span', 'tv-disp', '· disponível ' + tvEuro(i.disponivel, esc)));
       let nota = 'Calculado'; if (i.acerto) { const d = new Date(i.acerto.em); nota = 'Acertado a ' + d.getDate() + ' ' + MES3[d.getMonth()]; }
       const notaEl = el('span', 'tv-nota' + (i.acerto ? ' ok' : ''), nota);
       txt.append(el('span', 'tv-name', i.conta), sub, notaEl);

@@ -351,6 +351,14 @@ button,input,select{font:inherit;color:inherit}
 @keyframes foPulse{50%{opacity:.5}}
 .fo-sem{border:2px dashed var(--line)}
 #sh-capas,#sh-fotos{z-index:50}
+.tile-lab{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:2px}
+.tile-saldo{font-size:12.5px;color:var(--muted);margin-top:2px}
+.tile-saldo b{font-weight:600}
+.lim-bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:7px 0 4px}
+.lim-bar i{display:block;height:100%;border-radius:3px}
+.tile-lim{font-size:11.5px;color:var(--muted);line-height:1.3}
+.total-lim{margin:6px 0 0;font-size:14px;font-weight:600;color:#FF9F0A;line-height:1.35}
+.tv-limite{color:var(--t-orange);font-weight:600}
 [hidden]{display:none!important}
 @media (max-width:520px){.title{font-size:34px}.hero-num{font-size:38px}.ring{width:124px;height:124px}}
 @media (prefers-reduced-motion:no-preference){.card,.tile{animation:in .5s cubic-bezier(.2,.8,.2,1) both}@keyframes in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}}
@@ -424,6 +432,7 @@ button,input,select{font:inherit;color:inherit}
       <button type="button" class="card total-card" id="abrir-total" aria-label="Ver o total disponível em detalhe">
         <p class="label">Total disponível em todas as contas</p>
         <p class="total-val" id="total-contas">—</p>
+        <p class="total-lim" id="total-limite" hidden></p>
         <p class="hint" id="total-nota"></p>
         <span class="tv-ver">Ver detalhe <span aria-hidden="true">›</span></span>
       </button>
@@ -513,10 +522,11 @@ button,input,select{font:inherit;color:inherit}
 <div class="sheet-wrap" id="sh-acerto" hidden>
   <div class="sheet glass mf" role="dialog" aria-modal="true" aria-labelledby="a-titulo">
     <div class="mf-top"><button type="button" class="link" data-close>Cancelar</button><b id="a-titulo">Conta</b><button type="button" class="mf-save" id="a-ok">Guardar</button></div>
-    <p class="hint">Abre a app do banco e escreve o saldo que lá aparece agora. A partir daí, o Saldo junta os movimentos novos a esse valor.</p>
+    <p class="hint">Abre a app do banco e escreve o saldo que lá aparece agora (pode ser negativo). Se a conta tiver Conta Ordenado ou descoberto, põe o limite: o dashboard mostra quanto ainda podes usar. A partir daí, o Saldo junta os movimentos novos a esse valor.</p>
     <div class="mf-card">
       <div class="mf-row"><span class="mf-lab">Saldo calculado</span><span class="mf-val" id="a-calc">—</span></div>
       <label class="mf-row"><span class="mf-lab">Saldo real</span><input class="mf-in" id="a-valor" inputmode="decimal" autocomplete="off" placeholder="0,00" style="text-align:right;font-weight:600"><span class="mf-chev">€</span></label>
+      <label class="mf-row"><span class="mf-lab">Limite (descoberto)</span><input class="mf-in" id="a-limite" inputmode="decimal" autocomplete="off" placeholder="0" style="text-align:right;font-weight:600"><span class="mf-chev">€</span></label>
     </div>
     <p class="msg" id="a-msg" role="alert"></p>
     <button type="button" class="mf-del" id="a-remover" hidden>Voltar ao saldo calculado</button>
@@ -574,6 +584,7 @@ button,input,select{font:inherit;color:inherit}
         <div class="tv-amount" id="tv-total-amount" aria-live="polite">—</div>
         <div class="tv-status-line" id="tv-total-meta"></div>
         <div class="tv-trend" id="tv-total-trend"></div>
+        <div class="tv-acertos tv-limite" id="tv-limite" hidden></div>
         <div class="tv-acertos" id="tv-acertos"></div>
       </section>
       <section id="tv-contas" aria-labelledby="tv-contas-title">
