@@ -359,6 +359,21 @@ button,input,select{font:inherit;color:inherit}
 .tile-lim{font-size:11.5px;color:var(--muted);line-height:1.3}
 .total-lim{margin:6px 0 0;font-size:14px;font-weight:600;color:#FF9F0A;line-height:1.35}
 .tv-limite{color:var(--t-orange);font-weight:600}
+.lchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 4px}
+.lchips::-webkit-scrollbar{display:none}
+.lchips.wrap{flex-wrap:wrap;overflow:visible}
+.lchips.scroll{max-height:180px;overflow-y:auto}
+.lchip{flex:0 0 auto;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13.5px;font-weight:600;background:color-mix(in srgb,var(--panel) 55%,transparent);cursor:pointer;white-space:nowrap}
+.lchip.on{background:#FF9F0A;border-color:transparent;color:#fff}
+.lchip.lista{border-color:color-mix(in srgb,#FF9F0A 50%,transparent)}
+.lsep{flex:0 0 1px;background:var(--line);margin:4px 2px}
+.lresumo{margin:10px 2px 0;font-size:14px;color:var(--muted);line-height:1.45}
+.lresumo b{color:var(--fg)}
+.lresumo b.neg{color:#FF453A}.lresumo b.pos{color:#30D158}
+.sh-sub{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 2px 6px}
+.tg-tag{color:#FF9F0A!important;font-weight:600}
+.tg-del{border:0;background:color-mix(in srgb,var(--fg) 9%,transparent);width:28px;height:28px;border-radius:50%;font-size:18px;line-height:1;cursor:pointer;color:var(--muted);flex:0 0 auto}
+#sh-tags,#sh-lista{z-index:50}
 [hidden]{display:none!important}
 @media (max-width:520px){.title{font-size:34px}.hero-num{font-size:38px}.ring{width:124px;height:124px}}
 @media (prefers-reduced-motion:no-preference){.card,.tile{animation:in .5s cubic-bezier(.2,.8,.2,1) both}@keyframes in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}}
@@ -438,6 +453,12 @@ button,input,select{font:inherit;color:inherit}
       </button>
       <p class="hint">Toca numa conta para filtrar a página. Toca no lápis para pores o saldo real que vês na app do banco.</p>
       <div class="tiles" id="tiles"></div>
+    </section>
+
+    <section class="card" id="listas">
+      <div class="card-head"><h2>Listas e hashtags</h2><span class="ch-acoes"><button type="button" class="link" id="abrir-tags">Regras #</button><button type="button" class="link" id="nova-lista">+ Lista</button></span></div>
+      <div class="lchips" id="listas-chips" role="group" aria-label="Filtrar por lista ou hashtag"></div>
+      <p class="lresumo" id="listas-resumo" hidden></p>
     </section>
 
     <section class="card" id="movimentos">
@@ -545,6 +566,35 @@ button,input,select{font:inherit;color:inherit}
     <div class="mf-top"><button type="button" class="link" data-close>Voltar</button><b id="fo-title">Capa</b><span></span></div>
     <p class="msg" id="fo-msg" role="status"></p>
     <div class="fo-grid" id="fo-grid"></div>
+  </div>
+</div>
+
+<div class="sheet-wrap" id="sh-tags" hidden>
+  <div class="sheet glass mf" role="dialog" aria-modal="true" aria-label="Regras de hashtags">
+    <div class="mf-top"><button type="button" class="link" data-close>Fechar</button><b>Regras de hashtags</b><span></span></div>
+    <p class="hint">Escolhe um comerciante e a hashtag que os movimentos dele devem ter. Por exemplo, Continente com #Alimentação, ou Farmácia com #Medicamentos. Vale para todos os movimentos, antigos e novos.</p>
+    <div class="mf-card">
+      <label class="mf-row"><span class="mf-lab">Comerciante</span><select class="mf-in" id="tg-cat" style="text-align:right"></select></label>
+      <label class="mf-row"><span class="mf-lab">Hashtag</span><input class="mf-in" id="tg-tag" list="dl-tags" autocomplete="off" placeholder="#Alimentação" style="text-align:right;font-weight:600"></label>
+    </div>
+    <p class="msg" id="tg-msg" role="alert"></p>
+    <button type="button" class="btn big" id="tg-add">Adicionar regra</button>
+    <h3 class="sh-sub">As tuas regras</h3>
+    <div class="mf-card plist" id="tg-list"></div>
+  </div>
+</div>
+<datalist id="dl-tags"></datalist>
+<div class="sheet-wrap" id="sh-lista" hidden>
+  <div class="sheet glass mf" role="dialog" aria-modal="true" aria-labelledby="ls-title">
+    <div class="mf-top"><button type="button" class="link" data-close>Cancelar</button><b id="ls-title">Nova lista</b><button type="button" class="mf-save" id="ls-ok">Guardar</button></div>
+    <p class="hint">Uma lista é um filtro com nome. Mostra os movimentos que tenham qualquer uma das hashtags ou dos comerciantes escolhidos. Se escolheres contas ou o tipo, só entram movimentos dessas contas ou desse tipo.</p>
+    <div class="mf-card"><label class="mf-row"><span class="mf-lab">Nome</span><input class="mf-in" id="ls-nome" autocomplete="off" placeholder="Supermercado" style="text-align:right;font-weight:600"></label></div>
+    <div class="seg" id="ls-tipo" role="group" aria-label="Tipo"><button type="button" data-v="Tudo" class="on">Tudo</button><button type="button" data-v="Despesa">Despesas</button><button type="button" data-v="Receita">Receitas</button></div>
+    <h3 class="sh-sub">Hashtags</h3><div class="lchips wrap" id="ls-tags"></div>
+    <h3 class="sh-sub">Comerciantes</h3><div class="lchips wrap scroll" id="ls-cats"></div>
+    <h3 class="sh-sub">Contas</h3><div class="lchips wrap" id="ls-contas"></div>
+    <p class="msg" id="ls-msg" role="alert"></p>
+    <button type="button" class="mf-del" id="ls-del" hidden>Apagar lista</button>
   </div>
 </div>
 

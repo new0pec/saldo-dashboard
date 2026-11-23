@@ -186,14 +186,14 @@
   }
 
   // ---------- Estado e cálculos ----------
-  const S = { rows: [], meta: null, ano: '', mes: '', conta: '', grupo: '', categoria: '', q: '' };
+  const S = { rows: [], meta: null, ano: '', mes: '', conta: '', grupo: '', categoria: '', q: '', tag: '', lista: '' };
   let drawnBars = false;
 
   // ---------- Movimentos manuais e grupos personalizados (manuais.json no Dropbox) ----------
   const MAN_KEY = 'saldo.manuais';
   const normaliza = o => {
     o = o && typeof o === 'object' ? o : {};
-    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {}, capas: o.capas && typeof o.capas === 'object' ? o.capas : {}, limites: o.limites && typeof o.limites === 'object' ? o.limites : {} };
+    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {}, capas: o.capas && typeof o.capas === 'object' ? o.capas : {}, limites: o.limites && typeof o.limites === 'object' ? o.limites : {}, regras: o.regras && typeof o.regras === 'object' ? o.regras : {}, listas: Array.isArray(o.listas) ? o.listas : [] };
   };
   function migraNomes(o) {
     o.movimentos.forEach(m => { if (m) m.conta = nomeConta(m.conta); });
@@ -234,7 +234,8 @@
     const man = M.movimentos.filter(m => m && /^\d{4}-\d{2}-\d{2}$/.test(m.data)).flatMap(m => ocorrencias(m).map((data, k) => ({
       id: m.id, data, mes: data.slice(0, 7), montante: +m.montante, conta: m.conta, categoria: m.categoria, etiquetas: m.etiquetas || '',
       tipo: m.tipo, grupo: grupoDe(m.categoria, m.etiquetas, m.tipo), manual: true, serie: !!m.repetir && m.repetir !== 'nunca' })));
-    S.rows = base.concat(man);
+    S.rows = base.concat(man).map(r => ({ ...r, tags: tagsDe(r.etiquetas, r.categoria) }));
+    if (S.lista && !listaAtiva()) S.lista = '';
   }
   async function loadManuais() {
     if (!ligado()) return false;
@@ -262,6 +263,7 @@
       if (S.conta && r.conta !== S.conta) continue;
       if (S.ano && r.mes.slice(0, 4) !== S.ano) continue;
       if (r.tipo === 'Transferência') continue;
+      if (!passaFiltro(r)) continue;
       const o = m.get(r.mes) || { mes: r.mes, receitas: 0, despesas: 0 };
       if (r.montante > 0) o.receitas += r.montante; else o.despesas -= r.montante;
       m.set(r.mes, o);
@@ -281,7 +283,7 @@
   }
 
   function despesasFiltradas(comGrupo) {
-    return S.rows.filter(r => r.tipo === 'Despesa' && (!S.conta || r.conta === S.conta) && (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano) && (!comGrupo || !S.grupo || r.grupo === S.grupo));
+    return S.rows.filter(r => r.tipo === 'Despesa' && (!S.conta || r.conta === S.conta) && (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano) && (!comGrupo || !S.grupo || r.grupo === S.grupo) && passaFiltro(r));
   }
 
   function agrupa(rows, key) {
@@ -364,6 +366,7 @@
     drawCats();
     drawTiles(cs);
     drawList();
+    drawListas();
     if (typeof tvDesenha === 'function' && TV.aberta) tvDesenha();
   }
 
@@ -497,8 +500,8 @@
     if (S.categoria) { const b = el('button', 'filter', S.categoria + '  ×'); b.type = 'button'; b.onclick = () => set({ categoria: '' }); chips.push(b); }
     fc.replaceChildren(...chips);
     const q = S.q.trim().toLowerCase();
-    let rows = S.rows.filter(r => (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano) && (!S.conta || r.conta === S.conta) && (!S.grupo || r.grupo === S.grupo) && (!S.categoria || r.categoria === S.categoria)
-      && (!q || (r.categoria + ' ' + r.etiquetas + ' ' + r.conta + ' ' + r.grupo).toLowerCase().includes(q)));
+    let rows = S.rows.filter(r => (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano) && (!S.conta || r.conta === S.conta) && (!S.grupo || r.grupo === S.grupo) && (!S.categoria || r.categoria === S.categoria) && passaFiltro(r)
+      && (!q || (r.categoria + ' ' + r.tags.map(t => '#' + t).join(' ') + ' ' + r.conta + ' ' + r.grupo).toLowerCase().includes(q)));
     rows = rows.slice().sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : 0);
     if (!rows.length) { $('lista').replaceChildren(el('li', 'empty', 'Nenhum movimento encontrado.')); return; }
     const N = 150, out = []; let last = '';
@@ -506,7 +509,7 @@
     for (const r of rows.slice(0, N)) {
       if (r.data !== last) { out.push(el('li', 'txhead', fmtD(r.data))); last = r.data; }
       const li = el('li', 'tx-wrap'), row = el('div', 'tx'), mid = el('div'); mid.style.minWidth = '0';
-      mid.append(el('div', 'tx-t', r.categoria), el('div', 'tx-s', [r.manual ? (r.serie ? 'Manual · repete' : 'Manual') : '', r.grupo, r.etiquetas, r.conta].filter(Boolean).join(' · ')));
+      mid.append(el('div', 'tx-t', r.categoria), el('div', 'tx-s', [r.manual ? (r.serie ? 'Manual · repete' : 'Manual') : '', r.grupo, (r.tags || []).map(t => '#' + t).join(' '), r.conta].filter(Boolean).join(' · ')));
       const ti = el('div', 'tx-ico', ico(r.categoria)); ti.style.background = gcol(r.grupo); aplicaCapa(ti, r.categoria);
       row.append(ti, mid, el('div', 'tx-v' + (r.tipo === 'Transferência' ? ' mov' : r.montante > 0 ? ' pos' : ''), (r.montante > 0 ? '+' : '') + eur(r.montante)));
       const act = el('div', 'tx-act');
@@ -741,7 +744,7 @@
     opcoes: listaCats().map(c => ({ v: c, label: c, cor: gcol(grupoDe(c, '', F.tipo === 'Transferência' ? 'Despesa' : F.tipo)) })),
     fim: v => { F.categoria = v; } }));
   $('f-etq-btn').addEventListener('click', () => {
-    const todas = [...new Set(S.rows.flatMap(r => String(r.etiquetas || '').split(',').map(x => x.trim()).filter(Boolean)))].sort((a, b) => a.localeCompare(b, 'pt'));
+    const todas = todasTags();
     pick({ titulo: 'Hashtags', multi: true, criar: true, atual: String(F.etiquetas || '').split(',').map(x => x.trim()).filter(Boolean),
       opcoes: todas.map(t => ({ v: t, label: t, ini: '#', cor: '#0A84FF' })), fim: arr => { F.etiquetas = arr.join(', '); } });
   });
@@ -1086,6 +1089,117 @@
     }
   }
   $('abrir-capas').addEventListener('click', abrirCapas);
+
+  // ---------- Hashtags, regras por comerciante e listas (filtros guardados) ----------
+  const limpaTag = t => String(t || '').replace(/^#+/, '').trim();
+  function tagsDe(etq, cat) {
+    const base = String(etq || '').split(',').map(limpaTag).filter(Boolean);
+    const regra = (M.regras && M.regras[cat]) || [];
+    return [...new Set(base.concat(regra.map(limpaTag).filter(Boolean)))];
+  }
+  const listaAtiva = () => (M.listas || []).find(l => l.id === S.lista) || null;
+  function passaLista(r, l) {
+    if (!l) return true;
+    if (l.tipo === 'Despesa' && r.tipo !== 'Despesa') return false;
+    if (l.tipo === 'Receita' && r.tipo !== 'Receita') return false;
+    const temT = l.tags && l.tags.length, temC = l.cats && l.cats.length;
+    if ((temT || temC) && !((temT && l.tags.some(t => r.tags.includes(t))) || (temC && l.cats.includes(r.categoria)))) return false;
+    if (l.contas && l.contas.length && !l.contas.includes(r.conta)) return false;
+    return true;
+  }
+  const passaFiltro = r => (!S.tag || (r.tags || []).includes(S.tag)) && passaLista(r, listaAtiva());
+  function todasTags() {
+    const cont = new Map();
+    for (const r of S.rows) for (const t of r.tags || []) cont.set(t, (cont.get(t) || 0) + 1);
+    for (const ts of Object.values(M.regras || {})) for (const t of ts) if (!cont.has(limpaTag(t))) cont.set(limpaTag(t), 0);
+    return [...cont].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt')).map(x => x[0]);
+  }
+
+  function drawListas() {
+    const box = $('listas-chips'); if (!box) return;
+    const chip = (txt, on, fn, cls) => { const b = el('button', 'lchip' + (on ? ' on' : '') + (cls ? ' ' + cls : ''), txt); b.type = 'button'; b.setAttribute('aria-pressed', !!on); b.onclick = fn; return b; };
+    const itens = [chip('Tudo', !S.tag && !S.lista, () => set({ tag: '', lista: '' }))];
+    for (const l of M.listas || []) itens.push(chip('★ ' + l.nome, S.lista === l.id, () => set({ lista: S.lista === l.id ? '' : l.id, tag: '' }), 'lista'));
+    if ((M.listas || []).length) itens.push(el('span', 'lsep'));
+    for (const t of todasTags()) itens.push(chip('#' + t, S.tag === t, () => set({ tag: S.tag === t ? '' : t, lista: '' })));
+    box.replaceChildren(...itens);
+    const on = box.querySelector('.on'); if (on && box.scrollWidth > box.clientWidth) box.scrollLeft = on.offsetLeft - box.clientWidth / 2 + on.offsetWidth / 2;
+    const res = $('listas-resumo'), l = listaAtiva();
+    if (!S.tag && !l) { res.hidden = true; return; }
+    const rows = S.rows.filter(r => r.tipo !== 'Transferência' && (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano) && (!S.conta || r.conta === S.conta) && passaFiltro(r));
+    const desp = -d3.sum(rows.filter(r => r.montante < 0), r => r.montante), rec = d3.sum(rows.filter(r => r.montante > 0), r => r.montante);
+    const partes = [el('b', null, S.tag ? '#' + S.tag : l.nome), ': '];
+    if (desp) partes.push('despesas ', el('b', 'neg', eur(desp)));
+    if (desp && rec) partes.push(' · ');
+    if (rec) partes.push('receitas ', el('b', 'pos', eur(rec)));
+    if (!desp && !rec) partes.push('sem movimentos neste período');
+    partes.push(' · ' + rows.length + ' movimentos');
+    if (l) { const e = el('button', 'link', 'Editar lista'); e.type = 'button'; e.onclick = () => abrirLista(l); partes.push(' ', e); }
+    res.replaceChildren(...partes); res.hidden = false;
+  }
+
+  // Regras: comerciante (categoria) -> hashtags
+  function abrirTags() {
+    const cats = listaCats();
+    $('tg-cat').replaceChildren(new Option('Escolhe o comerciante', ''), ...cats.map(c => new Option(c, c)));
+    $('dl-tags').replaceChildren(...todasTags().map(t => new Option('#' + t)));
+    $('tg-tag').value = ''; $('tg-msg').textContent = '';
+    desenhaRegras(); abrir('sh-tags');
+  }
+  function desenhaRegras() {
+    const regras = Object.entries(M.regras || {}).filter(([, ts]) => ts && ts.length).sort((a, b) => a[0].localeCompare(b[0], 'pt'));
+    if (!regras.length) { $('tg-list').replaceChildren(el('p', 'empty', 'Ainda não tens regras. Escolhe um comerciante e escreve a hashtag.')); return; }
+    $('tg-list').replaceChildren(...regras.flatMap(([cat, ts]) => ts.map(t => {
+      const row = el('div', 'mf-row');
+      const i = el('span', 'mf-ico', ico(cat)); i.style.background = gcol(grupoDe(cat, '', 'Despesa')); i.style.color = '#fff'; i.style.fontWeight = '700'; aplicaCapa(i, cat);
+      const x = el('button', 'tg-del', '×'); x.type = 'button'; x.setAttribute('aria-label', 'Apagar regra ' + cat + ' #' + t);
+      x.onclick = () => { M.regras[cat] = M.regras[cat].filter(v => v !== t); if (!M.regras[cat].length) delete M.regras[cat]; desenhaRegras(); saveManuais('Regra apagada'); };
+      row.append(i, el('span', 'mf-lab', cat), el('span', 'mf-val tg-tag', '#' + t), x);
+      return row;
+    })));
+  }
+  $('tg-add').addEventListener('click', () => {
+    const cat = $('tg-cat').value, t = limpaTag($('tg-tag').value);
+    if (!cat) { $('tg-msg').textContent = 'Escolhe o comerciante.'; return; }
+    if (!t) { $('tg-msg').textContent = 'Escreve a hashtag, por exemplo #Alimentação.'; return; }
+    M.regras = M.regras || {}; M.regras[cat] = [...new Set((M.regras[cat] || []).concat(t))];
+    $('tg-tag').value = ''; $('tg-msg').textContent = ''; desenhaRegras(); saveManuais('Todos os movimentos de ' + cat + ' passam a ter #' + t);
+  });
+  $('abrir-tags').addEventListener('click', abrirTags);
+
+  // Listas: filtros guardados
+  let LE = null;
+  function chipsMulti(box, opcoes, sel, pref) {
+    box.replaceChildren(...opcoes.map(o => { const b = el('button', 'lchip' + (sel.has(o) ? ' on' : ''), (pref || '') + o); b.type = 'button';
+      b.onclick = () => { sel.has(o) ? sel.delete(o) : sel.add(o); b.classList.toggle('on'); }; return b; }));
+  }
+  function abrirLista(l) {
+    LE = { id: l ? l.id : null, tipo: l ? l.tipo || 'Tudo' : 'Tudo', tags: new Set(l ? l.tags : (S.tag ? [S.tag] : [])), cats: new Set(l ? l.cats : []), contas: new Set(l ? l.contas : []) };
+    $('ls-title').textContent = l ? 'Editar lista' : 'Nova lista';
+    $('ls-nome').value = l ? l.nome : (S.tag || '');
+    $('ls-tipo').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === LE.tipo));
+    chipsMulti($('ls-tags'), todasTags(), LE.tags, '#');
+    chipsMulti($('ls-cats'), listaCats(), LE.cats);
+    chipsMulti($('ls-contas'), listaContas(), LE.contas);
+    $('ls-del').hidden = !l; $('ls-msg').textContent = '';
+    abrir('sh-lista');
+  }
+  $('ls-tipo').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { LE.tipo = b.dataset.v; $('ls-tipo').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }));
+  $('ls-ok').addEventListener('click', () => {
+    const nome = $('ls-nome').value.trim();
+    if (!nome) { $('ls-msg').textContent = 'Dá um nome à lista, por exemplo Supermercado.'; return; }
+    if (!LE.tags.size && !LE.cats.size && !LE.contas.size && LE.tipo === 'Tudo') { $('ls-msg').textContent = 'Escolhe pelo menos uma hashtag, comerciante, conta ou tipo.'; return; }
+    const l = { id: LE.id || novoId(), nome, tipo: LE.tipo, tags: [...LE.tags], cats: [...LE.cats], contas: [...LE.contas] };
+    M.listas = (M.listas || []).filter(x => x.id !== l.id).concat(l);
+    S.lista = l.id; S.tag = '';
+    fechar('sh-lista'); saveManuais(LE.id ? 'Lista atualizada' : 'Lista «' + nome + '» criada');
+  });
+  $('ls-del').addEventListener('click', () => {
+    if (!window.confirm('Apagar esta lista? Os movimentos não são apagados.')) return;
+    M.listas = (M.listas || []).filter(x => x.id !== LE.id); if (S.lista === LE.id) S.lista = '';
+    fechar('sh-lista'); saveManuais('Lista apagada');
+  });
+  $('nova-lista').addEventListener('click', () => abrirLista(null));
 
   // 5. Editor de grupos
   const NOMES_G = Object.keys(GRUPOS).filter(g => g !== 'Rendimentos' && g !== 'Dinheiro').concat(['Rendimentos', 'Dinheiro', 'Outros']);
