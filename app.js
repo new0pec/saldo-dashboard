@@ -363,6 +363,7 @@
     drawRing(r);
     drawBars(ms);
     drawGroups();
+    drawSoma();
     drawCats();
     drawTiles(cs);
     drawList();
@@ -442,6 +443,31 @@
     const fg = $('filtroGrupo');
     if (!S.tag) fg.replaceChildren(el('span', 'hint', 'Todas as hashtags'));
     else { const bt = el('button', 'filter', '#' + S.tag + '  ×'); bt.type = 'button'; bt.style.background = tagCor(S.tag); bt.onclick = () => set({ tag: '', categoria: '' }); fg.replaceChildren(bt); }
+  }
+
+  // Somar hashtags: escolher várias # e ver o total junto
+  let SOMA = (() => { try { return JSON.parse(store.get('saldo.soma') || '[]'); } catch (e) { return []; } })();
+  function drawSoma() {
+    const rows = S.rows.filter(r => r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta) && (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano));
+    const tot = new Map();
+    for (const r of rows) if (r.tipo === 'Despesa') for (const t of r.ftags || []) tot.set(t, (tot.get(t) || 0) - r.montante);
+    const todas = [...new Set(S.rows.flatMap(r => r.ftags || []))].sort((a, b) => (tot.get(b) || 0) - (tot.get(a) || 0) || a.localeCompare(b, 'pt'));
+    const toggle = t => { SOMA = SOMA.includes(t) ? SOMA.filter(x => x !== t) : SOMA.concat(t); store.set('saldo.soma', JSON.stringify(SOMA)); drawSoma(); };
+    $('soma-chips').replaceChildren(...todas.map(t => { const b = el('button', 'lchip' + (SOMA.includes(t) ? ' on' : ''), '#' + t); b.type = 'button'; b.onclick = () => toggle(t); return b; }));
+    $('soma-limpar').hidden = !SOMA.length;
+    $('soma-limpar').onclick = () => { SOMA = []; store.set('saldo.soma', '[]'); drawSoma(); };
+    const res = $('soma-res');
+    if (!SOMA.length) { res.replaceChildren(el('div', 's-sub', 'Nenhuma hashtag escolhida. Toque nas hashtags em baixo.')); return; }
+    // cada movimento conta uma só vez, mesmo que tenha várias das hashtags escolhidas
+    const sel = rows.filter(r => (r.ftags || []).some(t => SOMA.includes(t)));
+    const desp = -d3.sum(sel.filter(r => r.tipo === 'Despesa'), r => r.montante), rec = d3.sum(sel.filter(r => r.tipo === 'Receita'), r => r.montante);
+    const linhas = SOMA.map(t => { const rs = rows.filter(r => r.tipo === 'Despesa' && (r.ftags || []).includes(t)); return { t, v: -d3.sum(rs, r => r.montante), n: rs.length }; });
+    res.replaceChildren(
+      el('div', 's-sub', 'Total gasto em ' + SOMA.map(t => '#' + t).join(' + ')),
+      el('div', 's-tot', eur(desp)),
+      el('div', 's-sub', sel.length + ' movimentos' + (rec ? ' · receitas ' + eur(rec) : '')),
+      ...linhas.map(l => { const d = el('div', 's-lin'); d.append(el('span', '', '#' + l.t + ' (' + l.n + ')'), el('strong', '', eur(l.v))); return d; })
+    );
   }
 
   function drawCats() {
