@@ -315,7 +315,7 @@
   function render() {
     const has = S.rows.length > 0;
     $('app').hidden = !has; $('onboard').hidden = has;
-    $('lede').hidden = !has; $('ano').hidden = !has; $('fab').hidden = !has;
+    $('lede').hidden = !has; $('ano').hidden = !has; $('fab').hidden = !has; document.body.classList.toggle('sem-dados', !has);
     if (!has) return;
     const ms = meses(), r = resumo(ms);
 
@@ -367,6 +367,7 @@
     drawCats();
     drawTiles(cs);
     drawList();
+    drawUltimos();
     drawListas();
     if (typeof tvDesenha === 'function' && TV.aberta) tvDesenha();
   }
@@ -469,7 +470,7 @@
       const bt = (txt, fn, cls) => { const x = el('button', cls || 'hs-b', txt); x.type = 'button'; x.onclick = fn; return x; };
       acts.append(el('div', 'hs-pct', (tot ? Math.round(r.total / tot * 100) : 0) + '% das despesas'),
         bt('Guardar', () => abrirSoma(null, sel)),
-        bt('Ver movimentos', () => { set({ multi: sel.slice(), tag: '', lista: '' }); $('movimentos').scrollIntoView({ behavior: 'smooth' }); }),
+        bt('Ver movimentos', () => { set({ multi: sel.slice(), tag: '', lista: '' }); irPara('movimentos'); }),
         bt('Limpar', () => { SOMA = []; guardaSel(); drawGroups(); }, 'hs-b leve'));
       bar.replaceChildren(info, acts); bar.classList.add('on');
     }
@@ -487,7 +488,7 @@
       const r = somaTags(sm.tags, rows), c = el('div', 'scard');
       const top = el('div', 'sc-top'); top.append(el('div', 'sc-nome', sm.nome));
       const ed = el('button', 'link', 'Editar'); ed.type = 'button'; ed.onclick = () => abrirSoma(sm); top.append(ed);
-      const ver = el('button', 'link', 'Ver movimentos'); ver.type = 'button'; ver.onclick = () => { set({ multi: sm.tags.slice(), tag: '', lista: '' }); $('movimentos').scrollIntoView({ behavior: 'smooth' }); };
+      const ver = el('button', 'link', 'Ver movimentos'); ver.type = 'button'; ver.onclick = () => { set({ multi: sm.tags.slice(), tag: '', lista: '' }); irPara('movimentos'); };
       const tags = el('div', 'sc-tags'); tags.append(...sm.tags.map(t => el('span', 'sc-tag', '#' + t)));
       const foot = el('div', 'sc-foot'); foot.append(el('span', 'sc-sub', r.n + ' movimentos · ' + (tot ? Math.round(r.total / tot * 100) : 0) + '% das despesas'), ver);
       c.append(top, el('div', 'sc-v', eur(r.total)), tags, foot);
@@ -512,7 +513,7 @@
     const top = c.slice(0, 12), max = top[0].total;
     $('cats').replaceChildren(...top.map(r => {
       const b = el('button', 'cat' + (S.categoria === r.nome ? ' on' : '')); b.type = 'button';
-      b.onclick = () => { const novo = S.categoria === r.nome ? '' : r.nome; set({ categoria: novo }); if (novo) $('movimentos').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); };
+      b.onclick = () => { const novo = S.categoria === r.nome ? '' : r.nome; set({ categoria: novo }); if (novo) irPara('movimentos'); };
       const mid = el('div'); mid.style.minWidth = '0';
       const tr = el('div', 'cat-track'), fl = el('div', 'cat-fill'); fl.style.width = (r.total / max * 100) + '%'; fl.style.background = gcol(r.grupo); tr.append(fl);
       mid.append(el('div', 'cat-name', r.nome), tr);
@@ -525,6 +526,7 @@
   function drawTiles(cs) {
     const total = d3.sum(cs, r => r.saldo), acertadas = cs.filter(r => r.acerto).length;
     $('total-contas').textContent = eur(total);
+    $('ini-total-v').textContent = eur(total); $('ini-total-v').style.color = total < 0 ? '#FF453A' : '';
     $('total-contas').style.color = total < 0 ? '#FF453A' : '';
     const comLim = cs.filter(r => r.limite > 0);
     $('total-limite').hidden = !comLim.length;
@@ -560,8 +562,42 @@
   // Tocar numa conta: a lista de movimentos mostra só essa conta
   function verConta(conta) {
     set({ conta, categoria: '', grupo: '' });
-    if (conta) { fecharLinhas(); const lst = $('lista'); if (lst) lst.scrollTop = 0; $('movimentos').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }
+    if (conta) { fecharLinhas(); const lst = $('lista'); if (lst) lst.scrollTop = 0; irPara('movimentos'); }
   }
+  function drawUltimos() {
+    const rows = S.rows.filter(r => !S.conta || r.conta === S.conta).slice().sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : 0).slice(0, 5);
+    if (!rows.length) { $('ult-lista').replaceChildren(el('li', 'empty', 'Sem movimentos.')); return; }
+    $('ult-lista').replaceChildren(...rows.map(r => {
+      const li = el('li', 'tx-wrap'), row = el('div', 'tx'), mid = el('div'); mid.style.minWidth = '0';
+      const [y, m, dd] = r.data.split('-');
+      mid.append(el('div', 'tx-t', r.categoria), el('div', 'tx-s', [(+dd) + ' ' + MES[+m - 1].slice(0, 3), (r.tags || []).map(t => '#' + t).join(' '), r.conta].filter(Boolean).join(' · ')));
+      const ti = el('div', 'tx-ico', ico(r.categoria)); ti.style.background = gcol(r.grupo); aplicaCapa(ti, r.categoria);
+      row.append(ti, mid, el('div', 'tx-v' + (r.tipo === 'Transferência' ? ' mov' : r.montante > 0 ? ' pos' : ''), (r.montante > 0 ? '+' : '') + eur(r.montante)));
+      li.append(row); return li;
+    }));
+  }
+
+  // ---------- Menu de baixo (separadores) ----------
+  const TABS = ['inicio', 'contas', 'gastos', 'movimentos', 'ajustes'];
+  let TAB = (() => { const h = (location.hash || '').slice(1), g = store.get('saldo.tab'); return TABS.includes(h) ? h : TABS.includes(g) ? g : 'inicio'; })();
+  function aplicaTab() {
+    document.querySelectorAll('#app [data-tab]').forEach(e => e.classList.toggle('fora', !e.dataset.tab.split(' ').includes(TAB)));
+    document.querySelectorAll('#tabbar [data-ir]').forEach(b => b.setAttribute('aria-selected', b.dataset.ir === TAB ? 'true' : 'false'));
+    TABS.forEach(t => document.body.classList.toggle('tab-' + t, t === TAB));
+  }
+  function irPara(t) {
+    if (!TABS.includes(t)) return;
+    const mudou = t !== TAB; TAB = t; store.set('saldo.tab', t);
+    try { history.replaceState(null, '', '#' + t); } catch (e) {}
+    aplicaTab();
+    if (mudou) window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('#tabbar [data-ir]').forEach(b => b.addEventListener('click', () => irPara(b.dataset.ir)));
+  document.querySelectorAll('#ajustes [data-clica]').forEach(b => b.addEventListener('click', () => { const alvo = $(b.dataset.clica); if (alvo) alvo.click(); }));
+  $('ini-total').addEventListener('click', () => $('abrir-total').click());
+  $('ver-todos').addEventListener('click', () => irPara('movimentos'));
+  aplicaTab();
+
   function drawList() {
     const fc = $('filtroCat'), chips = [];
     if (S.conta) { const b = el('button', 'filter', S.conta + '  ×'); b.type = 'button'; b.setAttribute('aria-label', 'Mostrar movimentos de todas as contas'); b.onclick = () => set({ conta: '' }); chips.push(b); }
