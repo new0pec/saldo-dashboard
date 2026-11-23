@@ -234,7 +234,7 @@
     const man = M.movimentos.filter(m => m && /^\d{4}-\d{2}-\d{2}$/.test(m.data)).flatMap(m => ocorrencias(m).map((data, k) => ({
       id: m.id, data, mes: data.slice(0, 7), montante: +m.montante, conta: m.conta, categoria: m.categoria, etiquetas: m.etiquetas || '',
       tipo: m.tipo, grupo: grupoDe(m.categoria, m.etiquetas, m.tipo), manual: true, serie: !!m.repetir && m.repetir !== 'nunca' })));
-    S.rows = base.concat(man).map(r => ({ ...r, tags: tagsDe(r.etiquetas, r.categoria) }));
+    S.rows = base.concat(man).map(r => ({ ...r, tags: tagsDe(r.etiquetas, r.categoria), ftags: [...new Set(String(r.etiquetas || '').split(',').map(t => t.replace(/^#+/, '').trim()).filter(Boolean))] }));
     if (S.lista && !listaAtiva()) S.lista = '';
   }
   async function loadManuais() {
@@ -421,21 +421,27 @@
 
   const setGrupo = g => set({ grupo: S.grupo === g ? '' : g, categoria: '' });
 
+  // Gastos por hashtag (as hashtags que vêm do ficheiro do MoneyStats)
+  const TAG_CORES = ['#FF9F0A', '#0A84FF', '#FF453A', '#FFD60A', '#5E5CE6', '#64D2FF', '#FF375F', '#30D158', '#BF5AF2', '#AC8E68', '#66D4CF', '#FF6B35', '#8E8E93', '#32ADE6', '#D63384', '#A2845E'];
+  const tagCor = t => { if (t === 'Sem hashtag') return '#8E8E93'; let h = 0; for (const c of t) h = (h * 31 + c.charCodeAt(0)) >>> 0; return TAG_CORES[h % TAG_CORES.length]; };
   function drawGroups() {
-    const gs = agrupa(despesasFiltradas(false), 'grupo');
-    $('gbar').replaceChildren(...gs.map(r => { const s = el('span'); s.style.flex = String(r.total); s.style.background = gcol(r.nome); s.style.opacity = S.grupo && S.grupo !== r.nome ? '.3' : '1'; s.onclick = () => setGrupo(r.nome); return s; }));
-    $('gbar').setAttribute('aria-label', 'Despesas por grupo: ' + gs.map(r => r.nome + ' ' + r.quota + '%').join(', '));
-    if (!gs.length) { $('gtiles').replaceChildren(el('p', 'empty', 'Sem despesas neste período.')); return; }
+    const rows = despesasFiltradas(false), tot = -d3.sum(rows, r => r.montante), m = new Map();
+    for (const r of rows) for (const t of (r.ftags && r.ftags.length ? r.ftags : ['Sem hashtag'])) m.set(t, (m.get(t) || 0) - r.montante);
+    const gs = [...m].map(([nome, total]) => ({ nome, total, quota: tot ? Math.round(total / tot * 100) : 0 })).filter(x => x.total > 0).sort((a, b) => b.total - a.total);
+    const setTag = t => set({ tag: S.tag === t ? '' : t, lista: '', categoria: '' });
+    $('gbar').replaceChildren(...gs.map(r => { const sp = el('span'); sp.style.flex = String(r.total); sp.style.background = tagCor(r.nome); sp.style.opacity = S.tag && S.tag !== r.nome ? '.3' : '1'; sp.onclick = () => setTag(r.nome); sp.title = '#' + r.nome; return sp; }));
+    $('gbar').setAttribute('aria-label', 'Despesas por hashtag: ' + gs.map(r => r.nome + ' ' + r.quota + '%').join(', '));
+    if (!gs.length) { $('gtiles').replaceChildren(el('p', 'empty', 'Sem despesas neste período.')); $('filtroGrupo').replaceChildren(); return; }
     $('gtiles').replaceChildren(...gs.map(r => {
-      const b = el('button', 'gtile' + (S.grupo === r.nome ? ' on' : S.grupo ? ' off' : '')); b.type = 'button'; b.onclick = () => setGrupo(r.nome);
-      const top = el('div', 'g-top'), ic = el('div', 'g-ico', ico(r.nome)); ic.style.background = gcol(r.nome);
-      top.append(ic, el('div', 'g-name', r.nome));
+      const b = el('button', 'gtile' + (S.tag === r.nome ? ' on' : S.tag ? ' off' : '')); b.type = 'button'; b.onclick = () => setTag(r.nome);
+      const top = el('div', 'g-top'), ic = el('div', 'g-ico', r.nome === 'Sem hashtag' ? '–' : '#'); ic.style.background = tagCor(r.nome);
+      top.append(ic, el('div', 'g-name', r.nome === 'Sem hashtag' ? r.nome : '#' + r.nome));
       b.append(top, el('div', 'g-val', eur(r.total)), el('div', 'g-pct', r.quota + '% das despesas'));
       return b;
     }));
     const fg = $('filtroGrupo');
-    if (!S.grupo) fg.replaceChildren(el('span', 'hint', 'Todos os grupos'));
-    else { const b = el('button', 'filter', S.grupo + '  ×'); b.type = 'button'; b.style.background = gcol(S.grupo); b.onclick = () => set({ grupo: '', categoria: '' }); fg.replaceChildren(b); }
+    if (!S.tag) fg.replaceChildren(el('span', 'hint', 'Todas as hashtags'));
+    else { const bt = el('button', 'filter', '#' + S.tag + '  ×'); bt.type = 'button'; bt.style.background = tagCor(S.tag); bt.onclick = () => set({ tag: '', categoria: '' }); fg.replaceChildren(bt); }
   }
 
   function drawCats() {
