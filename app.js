@@ -186,14 +186,14 @@
   }
 
   // ---------- Estado e cálculos ----------
-  const S = { rows: [], meta: null, ano: '', mes: '', conta: '', grupo: '', categoria: '', q: '', tag: '', lista: '' };
+  const S = { rows: [], meta: null, ano: '', mes: '', conta: '', grupo: '', categoria: '', q: '', tag: '', lista: '', multi: [] };
   let drawnBars = false;
 
   // ---------- Movimentos manuais e grupos personalizados (manuais.json no Dropbox) ----------
   const MAN_KEY = 'saldo.manuais';
   const normaliza = o => {
     o = o && typeof o === 'object' ? o : {};
-    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {}, capas: o.capas && typeof o.capas === 'object' ? o.capas : {}, limites: o.limites && typeof o.limites === 'object' ? o.limites : {}, regras: o.regras && typeof o.regras === 'object' ? o.regras : {}, listas: Array.isArray(o.listas) ? o.listas : [] };
+    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {}, capas: o.capas && typeof o.capas === 'object' ? o.capas : {}, limites: o.limites && typeof o.limites === 'object' ? o.limites : {}, regras: o.regras && typeof o.regras === 'object' ? o.regras : {}, listas: Array.isArray(o.listas) ? o.listas : [], somas: Array.isArray(o.somas) ? o.somas : [] };
   };
   function migraNomes(o) {
     o.movimentos.forEach(m => { if (m) m.conta = nomeConta(m.conta); });
@@ -309,7 +309,7 @@
     }).sort((a, b) => pos(a.conta) - pos(b.conta) || a.conta.localeCompare(b.conta, 'pt'));
   }
 
-  const set = patch => { Object.assign(S, patch); render(); };
+  const set = patch => { if (('tag' in patch || 'lista' in patch) && !('multi' in patch)) patch.multi = []; Object.assign(S, patch); render(); };
 
   // ---------- Desenho ----------
   function render() {
@@ -425,49 +425,85 @@
   // Gastos por hashtag (as hashtags que vêm do ficheiro do MoneyStats)
   const TAG_CORES = ['#FF9F0A', '#0A84FF', '#FF453A', '#FFD60A', '#5E5CE6', '#64D2FF', '#FF375F', '#30D158', '#BF5AF2', '#AC8E68', '#66D4CF', '#FF6B35', '#8E8E93', '#32ADE6', '#D63384', '#A2845E'];
   const tagCor = t => { if (t === 'Sem hashtag') return '#8E8E93'; let h = 0; for (const c of t) h = (h * 31 + c.charCodeAt(0)) >>> 0; return TAG_CORES[h % TAG_CORES.length]; };
+  // Gastos por hashtag (opção B): ranking com seleção e barra de soma
+  let SOMA = (() => { try { return JSON.parse(store.get('saldo.soma') || '[]'); } catch (e) { return []; } })();
+  let verTodas = false;
+  const guardaSel = () => store.set('saldo.soma', JSON.stringify(SOMA));
+  const rowsPeriodo = () => S.rows.filter(r => r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta) && (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano));
+  // soma das despesas com qualquer uma das hashtags (cada movimento conta uma vez)
+  function somaTags(tags, rows) {
+    const sel = rows.filter(r => r.tipo === 'Despesa' && (r.ftags || []).some(t => tags.includes(t)));
+    return { total: -d3.sum(sel, r => r.montante), n: sel.length };
+  }
   function drawGroups() {
-    const rows = despesasFiltradas(false), tot = -d3.sum(rows, r => r.montante), m = new Map();
-    for (const r of rows) for (const t of (r.ftags && r.ftags.length ? r.ftags : ['Sem hashtag'])) m.set(t, (m.get(t) || 0) - r.montante);
-    const gs = [...m].map(([nome, total]) => ({ nome, total, quota: tot ? Math.round(total / tot * 100) : 0 })).filter(x => x.total > 0).sort((a, b) => b.total - a.total);
-    const setTag = t => set({ tag: S.tag === t ? '' : t, lista: '', categoria: '' });
-    $('gbar').replaceChildren(...gs.map(r => { const sp = el('span'); sp.style.flex = String(r.total); sp.style.background = tagCor(r.nome); sp.style.opacity = S.tag && S.tag !== r.nome ? '.3' : '1'; sp.onclick = () => setTag(r.nome); sp.title = '#' + r.nome; return sp; }));
-    $('gbar').setAttribute('aria-label', 'Despesas por hashtag: ' + gs.map(r => r.nome + ' ' + r.quota + '%').join(', '));
-    if (!gs.length) { $('gtiles').replaceChildren(el('p', 'empty', 'Sem despesas neste período.')); $('filtroGrupo').replaceChildren(); return; }
-    $('gtiles').replaceChildren(...gs.map(r => {
-      const b = el('button', 'gtile' + (S.tag === r.nome ? ' on' : S.tag ? ' off' : '')); b.type = 'button'; b.onclick = () => setTag(r.nome);
-      const top = el('div', 'g-top'), ic = el('div', 'g-ico', r.nome === 'Sem hashtag' ? '–' : '#'); ic.style.background = tagCor(r.nome);
-      top.append(ic, el('div', 'g-name', r.nome === 'Sem hashtag' ? r.nome : '#' + r.nome));
-      b.append(top, el('div', 'g-val', eur(r.total)), el('div', 'g-pct', r.quota + '% das despesas'));
-      return b;
-    }));
+    const rows = rowsPeriodo(), desp = rows.filter(r => r.tipo === 'Despesa'), tot = -d3.sum(desp, r => r.montante), m = new Map();
+    for (const r of desp) for (const t of (r.ftags && r.ftags.length ? r.ftags : ['Sem hashtag'])) m.set(t, (m.get(t) || 0) - r.montante);
+    const gs = [...m].map(([nome, total]) => ({ nome, total })).filter(x => x.total > 0).sort((a, b) => b.total - a.total);
+    const max = gs.length ? gs[0].total : 1;
+    const toggle = t => { SOMA = SOMA.includes(t) ? SOMA.filter(x => x !== t) : SOMA.concat(t); guardaSel(); drawGroups(); };
+    if (!gs.length) { $('gtiles').replaceChildren(el('p', 'empty', 'Sem despesas neste período.')); }
+    else {
+      const vis = verTodas ? gs : gs.slice(0, 8);
+      const linhas = vis.map((r, i) => {
+        const on = SOMA.includes(r.nome), sem = r.nome === 'Sem hashtag';
+        const b = el('button', 'hrow' + (on ? ' on' : '')); b.type = 'button';
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        if (sem) b.disabled = true; else b.onclick = () => toggle(r.nome);
+        const ck = el('span', 'hck', on ? '✓' : ''), mid = el('span', 'hmid'), top = el('span', 'htop');
+        top.append(el('span', 'hn', sem ? r.nome : '#' + r.nome), el('span', 'hv', eur(r.total)));
+        const tr = el('span', 'htr'), fill = el('span', 'hfill'); fill.style.width = Math.max(2, Math.round(r.total / max * 100)) + '%'; tr.append(fill);
+        mid.append(top, tr, el('span', 'hp', (tot ? Math.round(r.total / tot * 100) : 0) + '% das despesas'));
+        b.append(sem ? el('span', 'hck vazio', '') : ck, mid);
+        return b;
+      });
+      if (gs.length > 8) { const mais = el('button', 'link hmais', verTodas ? 'Mostrar menos' : 'Ver todas as ' + gs.length + ' hashtags'); mais.type = 'button'; mais.onclick = () => { verTodas = !verTodas; drawGroups(); }; linhas.push(mais); }
+      $('gtiles').replaceChildren(...linhas);
+    }
+    // barra da soma
+    const bar = $('hsoma'), sel = SOMA.filter(t => m.has(t) || S.rows.some(r => (r.ftags || []).includes(t)));
+    if (!sel.length) { bar.replaceChildren(el('div', 'hs-n', 'Toque nas hashtags para somar')); bar.classList.remove('on'); }
+    else {
+      const r = somaTags(sel, rows), info = el('div', 'hs-info');
+      info.append(el('div', 'hs-n', sel.length + (sel.length === 1 ? ' hashtag escolhida' : ' hashtags escolhidas') + ' · ' + r.n + ' movimentos'), el('div', 'hs-v', eur(r.total)), el('div', 'hs-t', sel.map(t => '#' + t).join(' + ')));
+      const acts = el('div', 'hs-acts');
+      const bt = (txt, fn, cls) => { const x = el('button', cls || 'hs-b', txt); x.type = 'button'; x.onclick = fn; return x; };
+      acts.append(el('div', 'hs-pct', (tot ? Math.round(r.total / tot * 100) : 0) + '% das despesas'),
+        bt('Guardar', () => abrirSoma(null, sel)),
+        bt('Ver movimentos', () => { set({ multi: sel.slice(), tag: '', lista: '' }); $('movimentos').scrollIntoView({ behavior: 'smooth' }); }),
+        bt('Limpar', () => { SOMA = []; guardaSel(); drawGroups(); }, 'hs-b leve'));
+      bar.replaceChildren(info, acts); bar.classList.add('on');
+    }
     const fg = $('filtroGrupo');
-    if (!S.tag) fg.replaceChildren(el('span', 'hint', 'Todas as hashtags'));
-    else { const bt = el('button', 'filter', '#' + S.tag + '  ×'); bt.type = 'button'; bt.style.background = tagCor(S.tag); bt.onclick = () => set({ tag: '', categoria: '' }); fg.replaceChildren(bt); }
+    if (S.multi.length) { const bt = el('button', 'filter', S.multi.map(t => '#' + t).join(' + ') + '  ×'); bt.type = 'button'; bt.onclick = () => set({ multi: [], tag: '' }); fg.replaceChildren(bt); }
+    else if (!S.tag) fg.replaceChildren(el('span', 'hint', 'Todas as hashtags'));
+    else { const bt = el('button', 'filter', '#' + S.tag + '  ×'); bt.type = 'button'; bt.onclick = () => set({ tag: '', categoria: '' }); fg.replaceChildren(bt); }
   }
 
-  // Somar hashtags: escolher várias # e ver o total junto
-  let SOMA = (() => { try { return JSON.parse(store.get('saldo.soma') || '[]'); } catch (e) { return []; } })();
+  // Somas guardadas: cartões com seleções de hashtags
   function drawSoma() {
-    const rows = S.rows.filter(r => r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta) && (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano));
-    const tot = new Map();
-    for (const r of rows) if (r.tipo === 'Despesa') for (const t of r.ftags || []) tot.set(t, (tot.get(t) || 0) - r.montante);
-    const todas = [...new Set(S.rows.flatMap(r => r.ftags || []))].sort((a, b) => (tot.get(b) || 0) - (tot.get(a) || 0) || a.localeCompare(b, 'pt'));
-    const toggle = t => { SOMA = SOMA.includes(t) ? SOMA.filter(x => x !== t) : SOMA.concat(t); store.set('saldo.soma', JSON.stringify(SOMA)); drawSoma(); };
-    $('soma-chips').replaceChildren(...todas.map(t => { const b = el('button', 'lchip' + (SOMA.includes(t) ? ' on' : ''), '#' + t); b.type = 'button'; b.onclick = () => toggle(t); return b; }));
-    $('soma-limpar').hidden = !SOMA.length;
-    $('soma-limpar').onclick = () => { SOMA = []; store.set('saldo.soma', '[]'); drawSoma(); };
-    const res = $('soma-res');
-    if (!SOMA.length) { res.replaceChildren(el('div', 's-sub', 'Nenhuma hashtag escolhida. Toque nas hashtags em baixo.')); return; }
-    // cada movimento conta uma só vez, mesmo que tenha várias das hashtags escolhidas
-    const sel = rows.filter(r => (r.ftags || []).some(t => SOMA.includes(t)));
-    const desp = -d3.sum(sel.filter(r => r.tipo === 'Despesa'), r => r.montante), rec = d3.sum(sel.filter(r => r.tipo === 'Receita'), r => r.montante);
-    const linhas = SOMA.map(t => { const rs = rows.filter(r => r.tipo === 'Despesa' && (r.ftags || []).includes(t)); return { t, v: -d3.sum(rs, r => r.montante), n: rs.length }; });
-    res.replaceChildren(
-      el('div', 's-sub', 'Total gasto em ' + SOMA.map(t => '#' + t).join(' + ')),
-      el('div', 's-tot', eur(desp)),
-      el('div', 's-sub', sel.length + ' movimentos' + (rec ? ' · receitas ' + eur(rec) : '')),
-      ...linhas.map(l => { const d = el('div', 's-lin'); d.append(el('span', '', '#' + l.t + ' (' + l.n + ')'), el('strong', '', eur(l.v))); return d; })
-    );
+    const rows = rowsPeriodo(), tot = -d3.sum(rows.filter(r => r.tipo === 'Despesa'), r => r.montante), somas = M.somas || [];
+    if (!somas.length) { $('somas-lista').replaceChildren(el('p', 'empty', 'Ainda não tem somas guardadas. Escolha hashtags no cartão de cima e toque em Guardar.')); return; }
+    $('somas-lista').replaceChildren(...somas.map(sm => {
+      const r = somaTags(sm.tags, rows), c = el('div', 'scard');
+      const top = el('div', 'sc-top'); top.append(el('div', 'sc-nome', sm.nome));
+      const ed = el('button', 'link', 'Editar'); ed.type = 'button'; ed.onclick = () => abrirSoma(sm); top.append(ed);
+      const ver = el('button', 'link', 'Ver movimentos'); ver.type = 'button'; ver.onclick = () => { set({ multi: sm.tags.slice(), tag: '', lista: '' }); $('movimentos').scrollIntoView({ behavior: 'smooth' }); };
+      const tags = el('div', 'sc-tags'); tags.append(...sm.tags.map(t => el('span', 'sc-tag', '#' + t)));
+      const foot = el('div', 'sc-foot'); foot.append(el('span', 'sc-sub', r.n + ' movimentos · ' + (tot ? Math.round(r.total / tot * 100) : 0) + '% das despesas'), ver);
+      c.append(top, el('div', 'sc-v', eur(r.total)), tags, foot);
+      return c;
+    }));
+  }
+  let SE = null;
+  function abrirSoma(sm, tags) {
+    SE = { id: sm ? sm.id : null, tags: new Set(sm ? sm.tags : tags || []) };
+    $('so-title').textContent = sm ? 'Editar soma' : 'Guardar soma';
+    $('so-nome').value = sm ? sm.nome : '';
+    const todas = [...new Set(S.rows.flatMap(r => r.ftags || []))].sort((a, b) => a.localeCompare(b, 'pt'));
+    const ordem = [...SE.tags].filter(t => todas.includes(t)).concat(todas.filter(t => !SE.tags.has(t)));
+    chipsMulti($('so-tags'), ordem, SE.tags, '#');
+    $('so-del').hidden = !sm; $('so-msg').textContent = '';
+    abrir('sh-soma');
   }
 
   function drawCats() {
@@ -1139,7 +1175,7 @@
     if (l.contas && l.contas.length && !l.contas.includes(r.conta)) return false;
     return true;
   }
-  const passaFiltro = r => (!S.tag || (r.tags || []).includes(S.tag)) && passaLista(r, listaAtiva());
+  const passaFiltro = r => (!S.multi.length || (r.ftags || []).some(t => S.multi.includes(t))) && (!S.tag || (r.tags || []).includes(S.tag)) && passaLista(r, listaAtiva());
   function todasTags() {
     const cont = new Map();
     for (const r of S.rows) for (const t of r.tags || []) cont.set(t, (cont.get(t) || 0) + 1);
@@ -1232,6 +1268,22 @@
     fechar('sh-lista'); saveManuais('Lista apagada');
   });
   $('nova-lista').addEventListener('click', () => abrirLista(null));
+  $('so-ok').addEventListener('click', () => {
+    const nome = $('so-nome').value.trim();
+    if (!nome) { $('so-msg').textContent = 'Dê um nome a esta soma, por exemplo Comida.'; return; }
+    if (!SE.tags.size) { $('so-msg').textContent = 'Escolha pelo menos uma hashtag.'; return; }
+    const sm = { id: SE.id || novoId(), nome, tags: [...SE.tags] };
+    const lst = M.somas || [], i = lst.findIndex(x => x.id === sm.id);
+    M.somas = i >= 0 ? lst.map(x => x.id === sm.id ? sm : x) : lst.concat(sm);
+    if (!SE.id) { SOMA = []; guardaSel(); }
+    fechar('sh-soma'); saveManuais(SE.id ? 'Soma atualizada' : 'Soma «' + nome + '» guardada');
+  });
+  $('so-del').addEventListener('click', () => {
+    if (!window.confirm('Apagar esta soma guardada? As hashtags e os movimentos não são apagados.')) return;
+    M.somas = (M.somas || []).filter(x => x.id !== SE.id);
+    fechar('sh-soma'); saveManuais('Soma apagada');
+  });
+  $('nova-soma').addEventListener('click', () => abrirSoma(null, SOMA));
 
   // 5. Editor de grupos
   const NOMES_G = Object.keys(GRUPOS).filter(g => g !== 'Rendimentos' && g !== 'Dinheiro').concat(['Rendimentos', 'Dinheiro', 'Outros']);
