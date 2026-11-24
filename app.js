@@ -949,16 +949,17 @@
   function abrirAcerto(r) {
     acertoConta = r;
     $('a-titulo').textContent = r.conta;
-    $('a-calc').textContent = eur(r.calc);
+    $('a-calc').textContent = eur(r.calc).replace(/\s*€/, '');
     $('a-valor').value = r.acerto ? L.format(',.2f')(r.saldo).replace(/\u00a0/g, '') : '';
     $('a-remover').hidden = !r.acerto; $('a-msg').textContent = '';
     $('a-limite').value = r.limite ? L.format(',.2f')(r.limite).replace(/\u00a0/g, '') : '';
-    const ai = $('a-img-ico'); ai.className = 'mf-ico'; ai.textContent = ico(r.conta); ai.style.background = '#0A84FF'; ai.style.color = '#fff'; aplicaCapa(ai, 'conta:' + r.conta);
-    $('a-img-val').textContent = M.capas && M.capas['conta:' + r.conta] ? 'Mudar' : 'Escolher';
+    $('a-nome').textContent = r.conta;
+    const ai = $('a-img-ico'); ai.className = 'a-foto'; ai.textContent = ico(r.conta); ai.style.background = COLORS[Math.max(0, contas().map(c => c.conta).indexOf(r.conta)) % COLORS.length]; aplicaCapa(ai, 'conta:' + r.conta);
+    $('a-img-val').textContent = M.capas && M.capas['conta:' + r.conta] ? 'Mudar imagem' : 'Escolher imagem';
     abrir('sh-acerto');
     if (window.matchMedia('(pointer:fine)').matches) $('a-valor').focus();
   }
-  $('a-img').addEventListener('click', () => { if (!acertoConta) return; const c = acertoConta.conta; fechar('sh-acerto'); abrirFotos('conta:' + c, 'Imagem de ' + c, () => {}); });
+  $('a-img').addEventListener('click', () => { if (!acertoConta) return; const c = acertoConta.conta; fechar('sh-acerto'); const rc = acertoConta; abrirFotos('conta:' + c, 'Imagem de ' + c, () => abrirAcerto(rc)); });
   $('a-ok').addEventListener('click', () => {
     const txt = $('a-valor').value.replace(/\s/g, '').replace(/−/g, '-');
     const v = parseFloat(/,/.test(txt) ? txt.replace(/\.(?=\d{3})/g, '').replace(',', '.') : txt);
@@ -1182,7 +1183,7 @@
     const volta = depois || abrirCapas, nomeC = cat.replace(/^conta:/, '');
     $('fo-title').textContent = titulo || 'Capa de ' + cat; $('fo-msg').textContent = '';
     const grelha = $('fo-grid'); grelha.replaceChildren(); abrir('sh-fotos');
-    const sem = el('button', 'fo-item fo-sem', 'Sem capa'); sem.type = 'button';
+    const sem = el('button', 'fo-item fo-sem', cat.startsWith('conta:') ? 'Sem imagem' : 'Sem capa'); sem.type = 'button';
     sem.onclick = () => { if (M.capas) delete M.capas[cat]; fechar('sh-fotos'); volta(); saveManuais('Imagem removida'); };
     grelha.append(sem);
     if (!ligado()) { $('fo-msg').textContent = 'Liga o Dropbox nas definições para veres as fotos.'; return; }
