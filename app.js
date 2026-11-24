@@ -543,7 +543,7 @@
       const t = el('div', 'tile' + (S.conta === r.conta ? ' on' : ''));
       const b = el('button', 'tile-main'); b.type = 'button'; b.setAttribute('aria-pressed', S.conta === r.conta);
       b.onclick = () => verConta(S.conta === r.conta ? '' : r.conta);
-      const ic = el('div', 'tile-ico', ico(r.conta)); ic.style.background = COLORS[i % COLORS.length];
+      const ic = el('div', 'tile-ico', ico(r.conta)); ic.style.background = COLORS[i % COLORS.length]; aplicaCapa(ic, 'conta:' + r.conta);
       let nota = 'Calculado';
       if (r.acerto) { const d = new Date(r.acerto.em); nota = 'Acertado a ' + d.getDate() + ' ' + MES3[d.getMonth()]; }
       if (r.limite > 0) {
@@ -953,9 +953,12 @@
     $('a-valor').value = r.acerto ? L.format(',.2f')(r.saldo).replace(/\u00a0/g, '') : '';
     $('a-remover').hidden = !r.acerto; $('a-msg').textContent = '';
     $('a-limite').value = r.limite ? L.format(',.2f')(r.limite).replace(/\u00a0/g, '') : '';
+    const ai = $('a-img-ico'); ai.className = 'mf-ico'; ai.textContent = ico(r.conta); ai.style.background = '#0A84FF'; ai.style.color = '#fff'; aplicaCapa(ai, 'conta:' + r.conta);
+    $('a-img-val').textContent = M.capas && M.capas['conta:' + r.conta] ? 'Mudar' : 'Escolher';
     abrir('sh-acerto');
     if (window.matchMedia('(pointer:fine)').matches) $('a-valor').focus();
   }
+  $('a-img').addEventListener('click', () => { if (!acertoConta) return; const c = acertoConta.conta; fechar('sh-acerto'); abrirFotos('conta:' + c, 'Imagem de ' + c, () => {}); });
   $('a-ok').addEventListener('click', () => {
     const txt = $('a-valor').value.replace(/\s/g, '').replace(/−/g, '-');
     const v = parseFloat(/,/.test(txt) ? txt.replace(/\.(?=\d{3})/g, '').replace(',', '.') : txt);
@@ -1054,7 +1057,7 @@
     $('tv-cards').replaceChildren(...itens.map((i, idx) => {
       const esc = !TV.revelados.has(i.conta), st = tvEstado(i.disponivel);
       const li = el('li', 'tv-row' + (esc ? ' is-hidden' : '')); li.style.setProperty('--c', cor(idx));
-      const tile = el('span', 'tv-tile', tvInicial(i.conta)); tile.setAttribute('aria-hidden', 'true');
+      const tile = el('span', 'tv-tile', tvInicial(i.conta)); tile.setAttribute('aria-hidden', 'true'); aplicaCapa(tile, 'conta:' + i.conta);
       const txt = el('span', 'tv-text'), sub = el('span', 'tv-sub');
       sub.append(el('span', 'tv-st ' + st, TV_ESTADO[st]), el('span', null, '· ' + tvPct.format(quotas[idx])));
       if (i.limite > 0) sub.append(el('span', 'tv-disp', '· disponível ' + tvEuro(i.disponivel, esc)));
@@ -1159,6 +1162,13 @@
   function abrirCapas() {
     const cont = new Map(); for (const r of S.rows) if (r.tipo !== 'Transferência') cont.set(r.categoria, (cont.get(r.categoria) || 0) + 1);
     const cats = [...cont].sort((a, b) => b[1] - a[1]).map(x => x[0]);
+    const linhaConta = c => {
+      const b = el('button', 'mf-row'), k = 'conta:' + c; b.type = 'button';
+      const t = el('span', 'mf-ico', ico(c)); t.style.background = '#0A84FF'; t.style.color = '#fff'; t.style.fontWeight = '700'; aplicaCapa(t, k);
+      b.append(t, el('span', 'mf-lab', c), el('span', 'mf-val', M.capas && M.capas[k] ? 'Com imagem' : 'Sem imagem'), el('span', 'mf-chev', '›'));
+      b.onclick = () => abrirFotos(k, 'Imagem de ' + c); return b;
+    };
+    $('cp-contas').replaceChildren(...listaContas().map(linhaConta));
     $('cp-list').replaceChildren(...cats.map(c => {
       const b = el('button', 'mf-row'); b.type = 'button';
       const t = el('span', 'mf-ico', ico(c)); t.style.background = gcol(grupoDe(c, '', 'Despesa')); t.style.color = '#fff'; t.style.fontWeight = '700'; aplicaCapa(t, c);
@@ -1168,11 +1178,12 @@
     }));
     abrir('sh-capas');
   }
-  async function abrirFotos(cat) {
-    $('fo-title').textContent = 'Capa de ' + cat; $('fo-msg').textContent = '';
+  async function abrirFotos(cat, titulo, depois) {
+    const volta = depois || abrirCapas, nomeC = cat.replace(/^conta:/, '');
+    $('fo-title').textContent = titulo || 'Capa de ' + cat; $('fo-msg').textContent = '';
     const grelha = $('fo-grid'); grelha.replaceChildren(); abrir('sh-fotos');
     const sem = el('button', 'fo-item fo-sem', 'Sem capa'); sem.type = 'button';
-    sem.onclick = () => { if (M.capas) delete M.capas[cat]; fechar('sh-fotos'); abrirCapas(); saveManuais('Capa removida'); };
+    sem.onclick = () => { if (M.capas) delete M.capas[cat]; fechar('sh-fotos'); volta(); saveManuais('Imagem removida'); };
     grelha.append(sem);
     if (!ligado()) { $('fo-msg').textContent = 'Liga o Dropbox nas definições para veres as fotos.'; return; }
     let fotos;
@@ -1186,7 +1197,7 @@
       b.onclick = () => {
         M.capas = M.capas || {}; M.capas[cat] = f.path_display;
         const u = fotosThumbs[f.path_lower]; if (u) { capaCache[f.path_lower] = u; guardaCapaCache(); }
-        fechar('sh-fotos'); abrirCapas(); saveManuais('Capa de ' + cat + ' guardada'); carregaCapas();
+        fechar('sh-fotos'); volta(); saveManuais('Imagem de ' + nomeC + ' guardada'); carregaCapas();
       };
       b.dataset.p = f.path_lower; return b;
     });
