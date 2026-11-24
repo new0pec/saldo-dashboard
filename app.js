@@ -499,8 +499,42 @@
       const foot = el('div', 'sc-foot'); foot.append(el('span', 'sc-sub', sub), ver);
       const extra = ehRec ? (r.total > 0 ? 'Despesas: ' + eur(r.total) : '') : (r.rec > 0 ? 'Receitas: +' + eur(r.rec) : '');
       c.append(top, v, el('div', 'sc-sub', ehRec ? 'Recebido' : 'Gasto'), ...(extra ? [el('div', 'sc-sub', extra)] : []), tags, foot);
+      c.tabIndex = 0; c.setAttribute('role', 'button'); c.setAttribute('aria-label', sm.nome + ': ver o valor de cada mês');
+      c.onclick = e => { if (!e.target.closest('button')) abrirSomaMeses(sm); };
+      c.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === c) { e.preventDefault(); abrirSomaMeses(sm); } };
       return c;
     }));
+  }
+  // Valor de cada mês de uma soma guardada (segue o ano e a conta do topo, ignora o mês)
+  function abrirSomaMeses(sm) {
+    const rows = S.rows.filter(r => r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta) && (!S.ano || r.mes.slice(0, 4) === S.ano) && (r.ftags || []).some(t => sm.tags.includes(t)));
+    const m = new Map();
+    for (const r of rows) { const o = m.get(r.mes) || { d: 0, rc: 0, n: 0 }; if (r.tipo === 'Despesa') o.d -= r.montante; else if (r.tipo === 'Receita') o.rc += r.montante; o.n++; m.set(r.mes, o); }
+    const totD = d3.sum([...m.values()], o => o.d), totR = d3.sum([...m.values()], o => o.rc), ehRec = totR > 0 && totR >= totD;
+    // todos os meses do período, mesmo sem movimentos
+    const todos = [...new Set(S.rows.map(r => r.mes))].filter(x => !S.ano || x.slice(0, 4) === S.ano).sort();
+    let meses = todos;
+    if (m.size) { const ks = [...m.keys()].sort(); meses = todos.filter(x => x >= ks[0]); }
+    meses = meses.slice().reverse();
+    const val = k => { const o = m.get(k); return o ? (ehRec ? o.rc : o.d) : 0; };
+    const max = d3.max(meses, val) || 1, comV = meses.filter(k => val(k) > 0);
+    const varios = new Set(meses.map(k => k.slice(0, 4))).size > 1;
+    const nomeM = k => { const n = MES[+k.slice(5, 7) - 1]; return n[0].toUpperCase() + n.slice(1) + (varios || !S.ano ? ' ' + k.slice(0, 4) : ''); };
+    $('sm-title').textContent = sm.nome;
+    $('sm-sub').textContent = sm.tags.map(t => '#' + t).join(' + ') + ' · ' + (S.conta || 'todas as contas') + ' · ' + (S.ano || 'todos os anos');
+    const tot = ehRec ? totR : totD, media = comV.length ? tot / meses.length : 0, topo = comV.slice().sort((a, b) => val(b) - val(a))[0];
+    const st = (lab, v, cls) => { const d = el('div', 'sm-st'); d.append(el('span', 'sm-l', lab), el('b', cls || '', v)); return d; };
+    $('sm-resumo').replaceChildren(st(ehRec ? 'Recebido' : 'Gasto no total', (ehRec ? '+' : '') + eur(tot), ehRec ? 'pos' : ''), st('Média por mês', eur(media)), st(topo ? 'Mais alto · ' + MES3[+topo.slice(5, 7) - 1] : 'Mês mais alto', topo ? eur(val(topo)) : '—'));
+    if (!meses.length) { $('sm-meses').replaceChildren(el('p', 'empty', 'Sem movimentos neste período.')); abrir('sh-somames'); return; }
+    $('sm-meses').replaceChildren(...meses.map(k => {
+      const v = val(k), o = m.get(k), b = el('button', 'sm-row' + (v ? '' : ' zero')); b.type = 'button';
+      const topL = el('span', 'sm-top'); topL.append(el('span', 'sm-mes', nomeM(k)), el('span', 'sm-v' + (ehRec && v ? ' pos' : ''), v ? (ehRec ? '+' : '') + eur(v) : '—'));
+      const tr = el('span', 'htr'), f = el('span', 'hfill'); f.style.width = (v ? Math.max(2, v / max * 100) : 0) + '%'; f.style.background = ehRec ? '#30D158' : '#FF9F0A'; tr.append(f);
+      b.append(topL, tr, el('span', 'hp', o ? o.n + (o.n === 1 ? ' movimento' : ' movimentos') + (media && v ? ' · ' + (v >= media ? '+' : '−') + eur(Math.abs(v - media)).replace(/^−/, '') + ' face à média' : '') : 'Sem movimentos'));
+      b.onclick = () => { fechar('sh-somames'); set({ mes: k, ano: k.slice(0, 4), multi: sm.tags.slice(), tag: '', lista: '' }); irPara('movimentos'); };
+      return b;
+    }));
+    abrir('sh-somames');
   }
   let SE = null;
   function abrirSoma(sm, tags) {
