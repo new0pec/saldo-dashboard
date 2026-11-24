@@ -434,7 +434,8 @@
   // soma das despesas com qualquer uma das hashtags (cada movimento conta uma vez)
   function somaTags(tags, rows) {
     const sel = rows.filter(r => r.tipo === 'Despesa' && (r.ftags || []).some(t => tags.includes(t)));
-    return { total: -d3.sum(sel, r => r.montante), n: sel.length };
+    const rec = rows.filter(r => r.tipo === 'Receita' && (r.ftags || []).some(t => tags.includes(t)));
+    return { total: -d3.sum(sel, r => r.montante), n: sel.length, rec: d3.sum(rec, r => r.montante), nRec: rec.length };
   }
   function drawGroups() {
     const rows = rowsPeriodo(), desp = rows.filter(r => r.tipo === 'Despesa'), tot = -d3.sum(desp, r => r.montante), m = new Map();
@@ -482,7 +483,7 @@
 
   // Somas guardadas: cartões com seleções de hashtags
   function drawSoma() {
-    const rows = rowsPeriodo(), tot = -d3.sum(rows.filter(r => r.tipo === 'Despesa'), r => r.montante), somas = M.somas || [];
+    const rows = rowsPeriodo(), tot = -d3.sum(rows.filter(r => r.tipo === 'Despesa'), r => r.montante), totRec = d3.sum(rows.filter(r => r.tipo === 'Receita'), r => r.montante), somas = M.somas || [];
     if (!somas.length) { $('somas-lista').replaceChildren(el('p', 'empty', 'Ainda não tem somas guardadas. Escolha hashtags no cartão de cima e toque em Guardar.')); return; }
     $('somas-lista').replaceChildren(...somas.map(sm => {
       const r = somaTags(sm.tags, rows), c = el('div', 'scard');
@@ -490,8 +491,14 @@
       const ed = el('button', 'link', 'Editar'); ed.type = 'button'; ed.onclick = () => abrirSoma(sm); top.append(ed);
       const ver = el('button', 'link', 'Ver movimentos'); ver.type = 'button'; ver.onclick = () => { set({ multi: sm.tags.slice(), tag: '', lista: '' }); irPara('movimentos'); };
       const tags = el('div', 'sc-tags'); tags.append(...sm.tags.map(t => el('span', 'sc-tag', '#' + t)));
-      const foot = el('div', 'sc-foot'); foot.append(el('span', 'sc-sub', r.n + ' movimentos · ' + (tot ? Math.round(r.total / tot * 100) : 0) + '% das despesas'), ver);
-      c.append(top, el('div', 'sc-v', eur(r.total)), tags, foot);
+      // hashtags de receitas (ex.: #Ordenado) mostram o que entrou, a verde
+      const ehRec = r.rec > 0 && r.rec >= r.total;
+      const v = el('div', 'sc-v' + (ehRec ? ' pos' : ''), ehRec ? '+' + eur(r.rec) : eur(r.total));
+      const sub = ehRec ? r.nRec + ' movimentos · ' + (totRec ? Math.round(r.rec / totRec * 100) : 0) + '% das receitas'
+        : r.n + ' movimentos · ' + (tot ? Math.round(r.total / tot * 100) : 0) + '% das despesas';
+      const foot = el('div', 'sc-foot'); foot.append(el('span', 'sc-sub', sub), ver);
+      const extra = ehRec ? (r.total > 0 ? 'Despesas: ' + eur(r.total) : '') : (r.rec > 0 ? 'Receitas: +' + eur(r.rec) : '');
+      c.append(top, v, el('div', 'sc-sub', ehRec ? 'Recebido' : 'Gasto'), ...(extra ? [el('div', 'sc-sub', extra)] : []), tags, foot);
       return c;
     }));
   }
