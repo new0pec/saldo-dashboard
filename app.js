@@ -502,7 +502,7 @@
     $('so-nome').value = sm ? sm.nome : '';
     const todas = [...new Set(S.rows.flatMap(r => r.ftags || []))].sort((a, b) => a.localeCompare(b, 'pt'));
     const ordem = [...SE.tags].filter(t => todas.includes(t)).concat(todas.filter(t => !SE.tags.has(t)));
-    chipsMulti($('so-tags'), ordem, SE.tags, '#');
+    chipsMulti($('so-tags'), ordem, SE.tags, '#', () => { $('so-cont').textContent = SE.tags.size ? '· ' + SE.tags.size + ' escolhidas' : ''; });
     $('so-del').hidden = !sm; $('so-msg').textContent = '';
     abrir('sh-soma');
   }
@@ -1273,10 +1273,20 @@
 
   // Listas: filtros guardados
   let LE = null;
-  function chipsMulti(box, opcoes, sel, pref) {
+  function chipsMulti(box, opcoes, sel, pref, aoMudar) {
     box.replaceChildren(...opcoes.map(o => { const b = el('button', 'lchip' + (sel.has(o) ? ' on' : ''), (pref || '') + o); b.type = 'button';
-      b.onclick = () => { sel.has(o) ? sel.delete(o) : sel.add(o); b.classList.toggle('on'); }; return b; }));
+      b.onclick = () => { sel.has(o) ? sel.delete(o) : sel.add(o); b.classList.toggle('on'); if (aoMudar) aoMudar(); }; return b; }), el('p', 'chip-vazio', 'Nada encontrado.'));
+    const q = document.querySelector('[data-filtra="' + box.id + '"]'); if (q) { q.value = ''; filtraChips(box, ''); }
+    if (aoMudar) aoMudar();
   }
+  // pesquisa nas listas de botões (ignora acentos e maiúsculas)
+  const semAc = t => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/^#/, '');
+  function filtraChips(box, q) {
+    const k = semAc(q.trim()); let n = 0;
+    box.querySelectorAll('.lchip').forEach(b => { const ok = !k || semAc(b.textContent).includes(k); b.hidden = !ok; if (ok) n++; });
+    const v = box.querySelector('.chip-vazio'); if (v) v.hidden = n > 0;
+  }
+  document.querySelectorAll('[data-filtra]').forEach(i => i.addEventListener('input', () => filtraChips($(i.dataset.filtra), i.value)));
   function abrirLista(l) {
     LE = { id: l ? l.id : null, tipo: l ? l.tipo || 'Tudo' : 'Tudo', tags: new Set(l ? l.tags : (S.tag ? [S.tag] : [])), cats: new Set(l ? l.cats : []), contas: new Set(l ? l.contas : []) };
     $('ls-title').textContent = l ? 'Editar lista' : 'Nova lista';

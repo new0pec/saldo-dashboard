@@ -421,6 +421,9 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 .aj small{display:block;font-size:12.5px;color:var(--muted)}
 .aj span:nth-child(2){flex:1}
 .aj-s{color:var(--muted);font-size:20px}
+.chip-search{margin:0 0 8px}
+.chip-vazio{font-size:13px;color:var(--muted);padding:4px 2px}
+.sh-cont{font-weight:600;color:#FF9F0A;text-transform:none;letter-spacing:0}
 .lchip.lista{border-color:color-mix(in srgb,#FF9F0A 50%,transparent)}
 .lsep{flex:0 0 1px;background:var(--line);margin:4px 2px}
 .lresumo{margin:10px 2px 0;font-size:14px;color:var(--muted);line-height:1.45}
@@ -680,8 +683,8 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
     <p class="hint">Uma lista é um filtro com nome. Mostra os movimentos que tenham qualquer uma das hashtags ou dos comerciantes escolhidos. Se escolheres contas ou o tipo, só entram movimentos dessas contas ou desse tipo.</p>
     <div class="mf-card"><label class="mf-row"><span class="mf-lab">Nome</span><input class="mf-in" id="ls-nome" autocomplete="off" placeholder="Supermercado" style="text-align:right;font-weight:600"></label></div>
     <div class="seg" id="ls-tipo" role="group" aria-label="Tipo"><button type="button" data-v="Tudo" class="on">Tudo</button><button type="button" data-v="Despesa">Despesas</button><button type="button" data-v="Receita">Receitas</button></div>
-    <h3 class="sh-sub">Hashtags</h3><div class="lchips wrap" id="ls-tags"></div>
-    <h3 class="sh-sub">Comerciantes</h3><div class="lchips wrap scroll" id="ls-cats"></div>
+    <h3 class="sh-sub">Hashtags</h3><input class="search chip-search" type="search" data-filtra="ls-tags" placeholder="Procurar hashtag" aria-label="Procurar hashtag" autocomplete="off"><div class="lchips wrap scroll" id="ls-tags"></div>
+    <h3 class="sh-sub">Comerciantes</h3><input class="search chip-search" type="search" data-filtra="ls-cats" placeholder="Procurar comerciante" aria-label="Procurar comerciante" autocomplete="off"><div class="lchips wrap scroll" id="ls-cats"></div>
     <h3 class="sh-sub">Contas</h3><div class="lchips wrap" id="ls-contas"></div>
     <p class="msg" id="ls-msg" role="alert"></p>
     <button type="button" class="mf-del" id="ls-del" hidden>Apagar lista</button>
@@ -693,7 +696,7 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
     <div class="mf-top"><button type="button" class="link" data-close>Cancelar</button><b id="so-title">Guardar soma</b><button type="button" class="mf-save" id="so-ok">Guardar</button></div>
     <p class="hint">O cartão mostra sempre a soma destas hashtags para o mês, ano e conta escolhidos no topo.</p>
     <div class="mf-card"><label class="mf-row"><span class="mf-lab">Nome</span><input class="mf-in" id="so-nome" autocomplete="off" placeholder="Comida" style="text-align:right;font-weight:600"></label></div>
-    <h3 class="sh-sub">Hashtags (toque para pôr ou tirar)</h3><div class="lchips wrap scroll" id="so-tags"></div>
+    <h3 class="sh-sub">Hashtags (toque para pôr ou tirar) <span class="sh-cont" id="so-cont"></span></h3><input class="search chip-search" type="search" data-filtra="so-tags" placeholder="Procurar hashtag" aria-label="Procurar hashtag" autocomplete="off"><div class="lchips wrap scroll" id="so-tags"></div>
     <p class="msg" id="so-msg" role="alert"></p>
     <button type="button" class="mf-del" id="so-del" hidden>Apagar soma</button>
   </div>
