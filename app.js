@@ -368,6 +368,9 @@
     drawTiles(cs);
     drawList();
     drawUltimos();
+    drawRapido();
+    drawCalendario();
+    if ($('pg-q').value) pesquisaGlobal($('pg-q').value);
     drawListas();
     if (typeof tvDesenha === 'function' && TV.aberta) tvDesenha();
   }
@@ -498,13 +501,49 @@
         : r.n + ' movimentos · ' + (tot ? Math.round(r.total / tot * 100) : 0) + '% das despesas';
       const foot = el('div', 'sc-foot'); foot.append(el('span', 'sc-sub', sub), ver);
       const extra = ehRec ? (r.total > 0 ? 'Despesas: ' + eur(r.total) : '') : (r.rec > 0 ? 'Receitas: +' + eur(r.rec) : '');
-      c.append(top, v, el('div', 'sc-sub', ehRec ? 'Recebido' : 'Gasto'), ...(extra ? [el('div', 'sc-sub', extra)] : []), tags, foot);
+      const blocos = [top, v, el('div', 'sc-sub', ehRec ? 'Recebido' : 'Gasto'), ...(extra ? [el('div', 'sc-sub', extra)] : [])];
+      // 1. Orçamento por mês
+      if (!ehRec && sm.limite > 0) {
+        const nM = nMesesPeriodo(), lim = sm.limite * nM, fr = lim ? r.total / lim : 0;
+        const cor = fr >= 1 ? '#FF453A' : fr >= 0.8 ? '#FF9F0A' : '#30D158';
+        const tr = el('div', 'sc-orc'), f = el('i'); f.style.width = Math.min(100, fr * 100) + '%'; f.style.background = cor; tr.append(f);
+        tr.setAttribute('role', 'img'); tr.setAttribute('aria-label', 'Gasto ' + eur(r.total) + ' de ' + eur(lim));
+        const txt = fr >= 1 ? 'Passou ' + eur(r.total - lim) + ' do limite de ' + eur(lim) : 'Faltam ' + eur(lim - r.total) + ' de ' + eur(lim);
+        const t = el('div', 'sc-orc-t', txt + (nM > 1 ? ' (' + nM + ' meses)' : '')); t.style.color = fr >= 1 ? '#FF453A' : '';
+        blocos.push(tr, t);
+      }
+      // 4. Comparar com o mês anterior
+      const cmp = comparaMes(sm.tags, ehRec);
+      if (cmp) blocos.push(cmp);
+      c.append(...blocos, tags, foot);
       c.tabIndex = 0; c.setAttribute('role', 'button'); c.setAttribute('aria-label', sm.nome + ': ver o valor de cada mês');
       c.onclick = e => { if (!e.target.closest('button')) abrirSomaMeses(sm); };
       c.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === c) { e.preventDefault(); abrirSomaMeses(sm); } };
       return c;
     }));
   }
+  const prevMes = k => { let [y, m] = k.split('-').map(Number); m--; if (!m) { m = 12; y--; } return y + '-' + String(m).padStart(2, '0'); };
+  function mesRef() {
+    if (S.mes) return S.mes;
+    const ms = [...new Set(S.rows.filter(r => !S.ano || r.mes.slice(0, 4) === S.ano).map(r => r.mes))].sort();
+    return ms[ms.length - 1] || '';
+  }
+  function nMesesPeriodo() {
+    if (S.mes) return 1;
+    return Math.max(1, new Set(S.rows.filter(r => !S.ano || r.mes.slice(0, 4) === S.ano).map(r => r.mes)).size);
+  }
+  function comparaMes(tags, ehRec) {
+    const k = mesRef(); if (!k) return null;
+    const ant = prevMes(k), base = S.rows.filter(r => r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta));
+    const val = mes => { const x = somaTags(tags, base.filter(r => r.mes === mes)); return ehRec ? x.rec : x.total; };
+    const a = val(k), b = val(ant); if (!a && !b) return null;
+    const d = a - b, nomeAnt = MES[+ant.slice(5, 7) - 1], nomeK = MES[+k.slice(5, 7) - 1];
+    const bom = ehRec ? d >= 0 : d <= 0;
+    const e = el('div', 'sc-cmp ' + (Math.abs(d) < 0.005 ? 'igual' : bom ? 'bom' : 'mau'));
+    e.textContent = Math.abs(d) < 0.005 ? '= igual a ' + nomeAnt : (d > 0 ? '▲ ' : '▼ ') + eur(Math.abs(d)) + ' em ' + nomeK + ' face a ' + nomeAnt;
+    return e;
+  }
+
   // Valor de cada mês de uma soma guardada (segue o ano e a conta do topo, ignora o mês)
   function abrirSomaMeses(sm) {
     const rows = S.rows.filter(r => r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta) && (!S.ano || r.mes.slice(0, 4) === S.ano) && (r.ftags || []).some(t => sm.tags.includes(t)));
@@ -541,6 +580,7 @@
     SE = { id: sm ? sm.id : null, tags: new Set(sm ? sm.tags : tags || []) };
     $('so-title').textContent = sm ? 'Editar soma' : 'Guardar soma';
     $('so-nome').value = sm ? sm.nome : '';
+    $('so-lim').value = sm && sm.limite ? String(sm.limite).replace('.', ',') : '';
     const todas = [...new Set(S.rows.flatMap(r => r.ftags || []))].sort((a, b) => a.localeCompare(b, 'pt'));
     const ordem = [...SE.tags].filter(t => todas.includes(t)).concat(todas.filter(t => !SE.tags.has(t)));
     chipsMulti($('so-tags'), ordem, SE.tags, '#', () => { $('so-cont').textContent = SE.tags.size ? '· ' + SE.tags.size + ' escolhidas' : ''; });
@@ -605,6 +645,76 @@
     set({ conta, categoria: '', grupo: '' });
     if (conta) { fecharLinhas(); const lst = $('lista'); if (lst) lst.scrollTop = 0; irPara('movimentos'); }
   }
+  // 2. Adicionar rápido: comerciantes mais usados; o valor é sempre escrito por si
+  function drawRapido() {
+    const lim = new Date(); lim.setDate(lim.getDate() - 120); const desde = lim.toISOString().slice(0, 10);
+    const m = new Map();
+    for (const r of S.rows) if (r.tipo === 'Despesa' && r.data >= desde) { const o = m.get(r.categoria) || { n: 0, ult: r }; o.n++; if (r.data >= o.ult.data) o.ult = r; m.set(r.categoria, o); }
+    let top = [...m].sort((a, b) => b[1].n - a[1].n).slice(0, 8);
+    if (!top.length) top = [...new Map(S.rows.filter(r => r.tipo === 'Despesa').map(r => [r.categoria, { n: 1, ult: r }]))].slice(0, 8);
+    $('rapido').replaceChildren(...top.map(([cat, o]) => {
+      const b = el('button', 'rq'); b.type = 'button'; b.setAttribute('aria-label', 'Nova despesa em ' + cat);
+      const ic = el('span', 'rq-ico', ico(cat)); ic.style.background = gcol(o.ult.grupo); aplicaCapa(ic, cat);
+      const tx = el('span', 'rq-t'); tx.append(el('b', '', cat), el('small', '', o.ult.conta));
+      b.append(ic, tx);
+      b.onclick = () => { abrirForm({ tipo: 'Despesa', montante: 0, conta: o.ult.conta, categoria: cat, etiquetas: o.ult.etiquetas || '' }, true); C = ''; abrirCalc(); fDesenha(); };
+      return b;
+    }));
+  }
+
+  // 3. Calendário de gastos do mês
+  let CAL_DIA = '';
+  function drawCalendario() {
+    const k = mesRef(); if (!k) { $('cal-grid').replaceChildren(); return; }
+    const [y, mm] = k.split('-').map(Number), dias = new Date(y, mm, 0).getDate(), pri = (new Date(y, mm - 1, 1).getDay() + 6) % 7;
+    const rows = S.rows.filter(r => r.mes === k && r.tipo === 'Despesa' && (!S.conta || r.conta === S.conta));
+    const porDia = d3.rollup(rows, v => -d3.sum(v, r => r.montante), r => r.data);
+    const max = d3.max([...porDia.values()]) || 1, tot = d3.sum([...porDia.values()]);
+    $('cal-tit').textContent = MES[mm - 1][0].toUpperCase() + MES[mm - 1].slice(1) + ' ' + y + ' · ' + eur(tot);
+    const cel = [];
+    for (const d of ['S', 'T', 'Q', 'Q', 'S', 'S', 'D']) cel.push(el('span', 'cal-h', d));
+    for (let i = 0; i < pri; i++) cel.push(el('span', 'cal-vazio'));
+    for (let d = 1; d <= dias; d++) {
+      const iso = k + '-' + String(d).padStart(2, '0'), v = porDia.get(iso) || 0, b = el('button', 'cal-d' + (iso === CAL_DIA ? ' on' : ''), String(d)); b.type = 'button';
+      if (v) { const a = 0.18 + 0.82 * Math.sqrt(v / max); b.style.background = 'rgba(255,159,10,' + a.toFixed(2) + ')'; if (a > 0.55) b.style.color = '#fff'; }
+      b.setAttribute('aria-label', d + ' de ' + MES[mm - 1] + ': ' + (v ? eur(v) : 'sem gastos'));
+      b.onclick = () => { CAL_DIA = CAL_DIA === iso ? '' : iso; drawCalendario(); };
+      cel.push(b);
+    }
+    $('cal-grid').replaceChildren(...cel);
+    const det = $('cal-det');
+    if (!CAL_DIA || CAL_DIA.slice(0, 7) !== k) { det.replaceChildren(el('p', 'hint', 'Quanto mais escuro, mais gastou nesse dia. Toque num dia para ver os gastos.')); return; }
+    const doDia = rows.filter(r => r.data === CAL_DIA).sort((a, b) => a.montante - b.montante);
+    const cab = el('div', 'cal-cab'); cab.append(el('b', '', (+CAL_DIA.slice(8)) + ' de ' + MES[mm - 1]), el('b', '', eur(-d3.sum(doDia, r => r.montante))));
+    det.replaceChildren(cab, ...(doDia.length ? doDia.map(r => { const l = el('div', 'cal-l'); l.append(el('span', '', r.categoria + ((r.tags || []).length ? ' · #' + r.tags[0] : '')), el('span', '', eur(r.montante))); return l; }) : [el('p', 'hint', 'Sem gastos neste dia.')]));
+  }
+
+  // 5. Pesquisa universal
+  function pesquisaGlobal(q) {
+    const box = $('pg-res'), k = semAc(q.trim());
+    if (!k) { box.hidden = true; box.replaceChildren(); return; }
+    const rows = rowsPeriodo(), res = [];
+    const tagT = new Map(), catT = new Map();
+    for (const r of rows) {
+      for (const t of r.ftags || []) if (semAc(t).includes(k)) { const o = tagT.get(t) || { d: 0, rc: 0 }; if (r.tipo === 'Despesa') o.d -= r.montante; else o.rc += r.montante; tagT.set(t, o); }
+      if (semAc(r.categoria).includes(k)) { const o = catT.get(r.categoria) || { d: 0, rc: 0 }; if (r.tipo === 'Despesa') o.d -= r.montante; else o.rc += r.montante; catT.set(r.categoria, o); }
+    }
+    for (const sm of M.somas || []) if (semAc(sm.nome).includes(k)) { const x = somaTags(sm.tags, rows); res.push({ tipo: 'Soma', nome: sm.nome, v: x.rec > x.total ? '+' + eur(x.rec) : eur(x.total), ir: () => abrirSomaMeses(sm) }); }
+    for (const c of contas()) if (semAc(c.conta).includes(k)) res.push({ tipo: 'Conta', nome: c.conta, v: 'saldo ' + eur(c.saldo), ir: () => verConta(c.conta) });
+    const vt = o => o.d >= o.rc ? eur(o.d) : '+' + eur(o.rc);
+    [...tagT].sort((a, b) => (b[1].d + b[1].rc) - (a[1].d + a[1].rc)).slice(0, 6).forEach(([t, o]) => res.push({ tipo: 'Hashtag', nome: '#' + t, v: vt(o), ir: () => { set({ multi: [t], tag: '', lista: '', categoria: '' }); irPara('movimentos'); } }));
+    [...catT].sort((a, b) => (b[1].d + b[1].rc) - (a[1].d + a[1].rc)).slice(0, 6).forEach(([c, o]) => res.push({ tipo: 'Comerciante', nome: c, v: vt(o), ir: () => { set({ categoria: c, multi: [], tag: '', lista: '' }); irPara('movimentos'); } }));
+    box.hidden = false;
+    if (!res.length) { box.replaceChildren(el('p', 'pg-vazio', 'Nada encontrado.')); return; }
+    box.replaceChildren(...res.map(x => {
+      const b = el('button', 'pg-item'); b.type = 'button';
+      const l = el('span', 'pg-l'); l.append(el('b', '', x.nome), el('small', '', x.tipo));
+      b.append(l, el('span', 'pg-v', x.v));
+      b.onclick = () => { $('pg-q').value = ''; pesquisaGlobal(''); $('pg-q').blur(); x.ir(); };
+      return b;
+    }));
+  }
+
   function drawUltimos() {
     const rows = S.rows.filter(r => !S.conta || r.conta === S.conta).slice().sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : 0).slice(0, 5);
     if (!rows.length) { $('ult-lista').replaceChildren(el('li', 'empty', 'Sem movimentos.')); return; }
@@ -637,6 +747,10 @@
   document.querySelectorAll('#ajustes [data-clica]').forEach(b => b.addEventListener('click', () => { const alvo = $(b.dataset.clica); if (alvo) alvo.click(); }));
   $('ini-total').addEventListener('click', () => $('abrir-total').click());
   $('ver-todos').addEventListener('click', () => irPara('movimentos'));
+  $('pg-q').addEventListener('input', e => pesquisaGlobal(e.target.value));
+  $('pg-q').addEventListener('keydown', e => { if (e.key === 'Escape') { e.target.value = ''; pesquisaGlobal(''); } });
+  document.addEventListener('click', e => { if (!e.target.closest('#pg')) $('pg-res').hidden = true; });
+  $('pg-q').addEventListener('focus', e => { if (e.target.value) pesquisaGlobal(e.target.value); });
   aplicaTab();
 
   function drawList() {
@@ -1371,7 +1485,10 @@
     const nome = $('so-nome').value.trim();
     if (!nome) { $('so-msg').textContent = 'Dê um nome a esta soma, por exemplo Comida.'; return; }
     if (!SE.tags.size) { $('so-msg').textContent = 'Escolha pelo menos uma hashtag.'; return; }
-    const sm = { id: SE.id || novoId(), nome, tags: [...SE.tags] };
+    const limTxt = $('so-lim').value.trim().replace(/\s|€/g, '').replace(/\./g, '').replace(',', '.');
+    const limite = limTxt ? +limTxt : 0;
+    if (limTxt && !(limite >= 0)) { $('so-msg').textContent = 'O limite tem de ser um número, por exemplo 350.'; return; }
+    const sm = { id: SE.id || novoId(), nome, tags: [...SE.tags] }; if (limite > 0) sm.limite = Math.round(limite * 100) / 100;
     const lst = M.somas || [], i = lst.findIndex(x => x.id === sm.id);
     M.somas = i >= 0 ? lst.map(x => x.id === sm.id ? sm : x) : lst.concat(sm);
     if (!SE.id) { SOMA = []; guardaSel(); }

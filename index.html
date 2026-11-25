@@ -429,6 +429,36 @@ span.mf-num{color:var(--muted);font-weight:500}
 .sm-top{display:flex;justify-content:space-between;gap:8px;font-size:15px}
 .sm-mes{font-weight:600}
 .sm-v{font-weight:800;font-variant-numeric:tabular-nums}
+.sc-orc{height:7px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:2px}
+.sc-orc i{display:block;height:100%;border-radius:4px}
+.sc-orc-t{font-size:12px;color:var(--muted)}
+.sc-cmp{font-size:12.5px;font-weight:700}
+.sc-cmp.bom{color:#30D158}.sc-cmp.mau{color:#FF453A}.sc-cmp.igual{color:var(--muted)}
+.rapido{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.rq{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:16px;padding:9px 10px;background:color-mix(in srgb,var(--panel) 45%,transparent);color:inherit;font:inherit;text-align:left;cursor:pointer;min-width:0}
+.rq:active{transform:scale(.97)}
+.rq-ico{width:34px;height:34px;flex:0 0 34px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;overflow:hidden}
+.rq-t{min-width:0;display:flex;flex-direction:column}
+.rq-t b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rq-t small{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.cal-h{font-size:11.5px;text-align:center;color:var(--muted);font-weight:600}
+.cal-d{aspect-ratio:1;border:0;border-radius:10px;background:color-mix(in srgb,var(--fg) 6%,transparent);color:inherit;font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:0}
+.cal-d.on{outline:2px solid var(--fg);outline-offset:1px}
+.cal-det{margin-top:10px}
+.cal-cab{display:flex;justify-content:space-between;font-size:15px;padding:4px 2px 6px;border-bottom:1px solid var(--line)}
+.cal-l{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;padding:6px 2px;border-bottom:1px solid var(--line)}
+.cal-l span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg{position:relative;margin-top:10px}
+.pg-q{width:100%;margin:0}
+.pg-res{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:20;background:color-mix(in srgb,var(--page) 94%,transparent)!important;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);border-radius:18px;padding:6px;border:1px solid var(--line);max-height:60vh;overflow:auto}
+.pg-item{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;padding:9px 10px;border-radius:12px;cursor:pointer}
+.pg-item:active,.pg-item:hover{background:color-mix(in srgb,var(--fg) 8%,transparent)}
+.pg-l{min-width:0;display:flex;flex-direction:column}
+.pg-l b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-l small{font-size:12px;color:var(--muted)}
+.pg-v{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pg-vazio{padding:10px;color:var(--muted);font-size:14px}
 .sc-tags{display:flex;flex-wrap:wrap;gap:4px}
 .sc-tag{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,#FF9F0A 22%,transparent)}
 .sc-sub{font-size:12px;color:var(--muted)}
@@ -481,6 +511,10 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
     </div>
     <p class="lede" id="lede">—</p>
     <div class="src-row"><p class="src" id="fonte">Sem dados</p></div>
+    <div class="pg" id="pg">
+      <input class="search pg-q" id="pg-q" type="search" placeholder="Procurar hashtag, comerciante, conta ou soma" aria-label="Pesquisa" autocomplete="off">
+      <div class="pg-res glass" id="pg-res" hidden></div>
+    </div>
   </header>
 
   <section class="card onboard" id="onboard" hidden>
@@ -512,6 +546,12 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
       <div class="ring" id="ring"></div>
     </section>
 
+    <section class="card" id="rapido-card" data-tab="inicio">
+      <div class="card-head"><h2>Adicionar rápido</h2></div>
+      <p class="hint" style="margin:-4px 0 10px">Os comerciantes que mais usa. Toque e escreva o valor.</p>
+      <div class="rapido" id="rapido"></div>
+    </section>
+
     <button type="button" class="card ini-total" id="ini-total" data-tab="inicio" aria-label="Ver o total disponível">
       <span><span class="label">Total disponível</span><span class="ini-v" id="ini-total-v">—</span></span><span class="tv-ver">Ver <span aria-hidden="true">›</span></span>
     </button>
@@ -525,6 +565,12 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
     <section class="card" id="ultimos" data-tab="inicio">
       <div class="card-head"><h2>Últimos movimentos</h2><button type="button" class="link" id="ver-todos">Ver todos</button></div>
       <ul class="txlist mini" id="ult-lista"></ul>
+    </section>
+
+    <section class="card" id="calendario" data-tab="gastos">
+      <div class="card-head"><h2>Calendário de gastos</h2><span class="hint" id="cal-tit"></span></div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="cal-det" id="cal-det"></div>
     </section>
 
     <section class="card" id="grupos" data-tab="gastos">
@@ -733,7 +779,8 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
   <div class="sheet glass mf" role="dialog" aria-modal="true" aria-labelledby="so-title">
     <div class="mf-top"><button type="button" class="link" data-close>Cancelar</button><b id="so-title">Guardar soma</b><button type="button" class="mf-save" id="so-ok">Guardar</button></div>
     <p class="hint">O cartão mostra sempre a soma destas hashtags para o mês, ano e conta escolhidos no topo.</p>
-    <div class="mf-card"><label class="mf-row"><span class="mf-lab">Nome</span><input class="mf-in" id="so-nome" autocomplete="off" placeholder="Comida" style="text-align:right;font-weight:600"></label></div>
+    <div class="mf-card"><label class="mf-row"><span class="mf-lab">Nome</span><input class="mf-in" id="so-nome" autocomplete="off" placeholder="Comida" style="text-align:right;font-weight:600"></label>
+      <label class="mf-row"><span class="mf-lab">Limite por mês</span><input class="mf-in mf-num" id="so-lim" inputmode="decimal" autocomplete="off" placeholder="sem limite"><span class="mf-eur">€</span></label></div>
     <h3 class="sh-sub">Hashtags (toque para pôr ou tirar) <span class="sh-cont" id="so-cont"></span></h3><input class="search chip-search" type="search" data-filtra="so-tags" placeholder="Procurar hashtag" aria-label="Procurar hashtag" autocomplete="off"><div class="lchips wrap scroll" id="so-tags"></div>
     <p class="msg" id="so-msg" role="alert"></p>
     <button type="button" class="mf-del" id="so-del" hidden>Apagar soma</button>
@@ -813,6 +860,6 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 
 <input type="file" id="file" accept=".txt,.csv,text/plain,text/csv" hidden>
 
-<script src="app.js?v=202611241722"></script>
+<script src="app.js?v=202611250229"></script>
 </body>
 </html>
