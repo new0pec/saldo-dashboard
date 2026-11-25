@@ -512,13 +512,12 @@
     if (!sel.length) { bar.replaceChildren(el('div', 'hs-n', 'Toca nas hashtags para somar')); bar.classList.remove('on'); }
     else {
       const r = somaTags(sel, rows), info = el('div', 'hs-info');
-      info.append(el('div', 'hs-n', sel.length + (sel.length === 1 ? ' hashtag escolhida' : ' hashtags escolhidas') + ' · ' + r.n + ' movimentos'), el('div', 'hs-v', eur(r.total)), el('div', 'hs-t', sel.map(t => '#' + t).join(' + ')));
+      info.append(el('div', 'hs-v', eur(r.total)), el('div', 'hs-n', r.n + ' movimentos · ' + (tot ? Math.round(r.total / tot * 100) : 0) + '% das despesas'), el('div', 'hs-t', sel.map(t => '#' + t).join(' + ')));
       const acts = el('div', 'hs-acts');
       const bt = (txt, fn, cls) => { const x = el('button', cls || 'hs-b', txt); x.type = 'button'; x.onclick = fn; return x; };
-      acts.append(el('div', 'hs-pct', (tot ? Math.round(r.total / tot * 100) : 0) + '% das despesas'),
-        bt('Guardar', () => abrirSoma(null, sel)),
-        bt('Ver movimentos', () => { set({ multi: sel.slice(), tag: '', lista: '' }); irPara('movimentos'); }),
-        bt('Limpar', () => { SOMA = []; guardaSel(); drawGroups(); }, 'hs-b leve'));
+      acts.append(bt('Guardar', () => abrirSoma(null, sel)),
+        bt('Ver', () => { set({ multi: sel.slice(), tag: '', lista: '' }); irPara('movimentos'); }),
+        bt('×', () => { SOMA = []; guardaSel(); drawGroups(); }, 'hs-b leve hs-x')); acts.lastChild.setAttribute('aria-label', 'Limpar a seleção');
       bar.replaceChildren(info, acts); bar.classList.add('on');
     }
     const fg = $('filtroGrupo');
@@ -1099,7 +1098,8 @@
       css += '}';
     }
     st.textContent = css;
-    const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = t.page || '#FF9F0A';
+    // cor da barra das horas no iPhone = fundo do tema
+    requestAnimationFrame(() => { const cor = getComputedStyle(document.documentElement).getPropertyValue('--page').trim() || '#f6efe9'; document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = cor; }); });
     $('temas').querySelectorAll('.tema').forEach(b => b.setAttribute('aria-checked', String(b.dataset.id === t.id)));
   }
   $('temas').replaceChildren(...TEMAS.map(t => {
@@ -1234,6 +1234,18 @@
   // O Safari no iPhone às vezes engole o "click" (ao tocar durante o deslizar da página ou junto à barra de baixo).
   // Por isso o menu reage logo ao levantar o dedo, e o click fica como reserva.
   let toqueTab = null;
+  // esconde o + ao descer e mostra ao subir (ou perto do fim da página)
+  (() => {
+    const pg = document.querySelector('main.ios'); if (!pg) return; let ult = 0, pedido = false;
+    pg.addEventListener('scroll', () => {
+      if (pedido) return; pedido = true;
+      requestAnimationFrame(() => {
+        pedido = false; const y = pg.scrollTop, fim = y + pg.clientHeight >= pg.scrollHeight - 40;
+        if (Math.abs(y - ult) > 6) { document.body.classList.toggle('fab-fora', y > ult && y > 80 && !fim); ult = y; }
+        if (fim) document.body.classList.remove('fab-fora');
+      });
+    }, { passive: true });
+  })();
   document.querySelectorAll('#tabbar [data-ir]').forEach(b => {
     b.addEventListener('pointerdown', e => { toqueTab = { b, x: e.clientX, y: e.clientY }; });
     b.addEventListener('pointerup', e => {
