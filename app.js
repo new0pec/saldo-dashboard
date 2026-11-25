@@ -388,7 +388,7 @@
 
     // Resumo
     $('liquido').textContent = r ? eur(r.liquido) : '—';
-    $('liquido').style.color = r && r.liquido < 0 ? '#FF453A' : '';
+    $('liquido').style.color = r && r.liquido < 0 ? 'var(--hero-neg,var(--neg))' : '';
     $('receitas').textContent = r ? eur(r.receitas) : '—';
     $('despesas').textContent = r ? eur(r.despesas) : '—';
     if (r && r.var_despesas != null) {
@@ -425,7 +425,7 @@
     const box = $('ring'); box.replaceChildren();
     if (!r || r.gasto_pct == null) return;
     const W = 150, R = 62, C = 2 * Math.PI * R, pct = r.gasto_pct, frac = Math.min(pct, 100) / 100;
-    const col = pct > 100 ? '#FF453A' : pct > 90 ? '#FF9F0A' : '#30D158';
+    const col = pct > 100 ? 'var(--neg)' : pct > 90 ? '#FF9F0A' : 'var(--pos)';
     const svg = d3.select(box).append('svg').attr('viewBox', `0 0 ${W} ${W}`).attr('role', 'img').attr('aria-label', `Gastaste ${pct}% da receita do período`);
     svg.append('circle').attr('cx', W / 2).attr('cy', W / 2).attr('r', R).attr('fill', 'none').style('stroke', 'var(--line)').attr('stroke-width', 16);
     const arc = svg.append('circle').attr('cx', W / 2).attr('cy', W / 2).attr('r', R).attr('fill', 'none').style('stroke', col).attr('stroke-width', 16).attr('stroke-linecap', 'round').attr('transform', `rotate(-90 ${W / 2} ${W / 2})`).attr('stroke-dasharray', C);
@@ -462,7 +462,7 @@
       .on('pointerleave', () => { tip.hidden = true; });
     const rr = Math.min(6, x2.bandwidth() / 2);
     ['receitas', 'despesas'].forEach(key => {
-      const bars = g.append('rect').attr('x', x2(key)).attr('width', x2.bandwidth()).attr('rx', rr).style('fill', key === 'receitas' ? '#30D158' : '#FF453A');
+      const bars = g.append('rect').attr('x', x2(key)).attr('width', x2.bandwidth()).attr('rx', rr).style('fill', key === 'receitas' ? 'var(--pos)' : 'var(--neg)');
       if (reduce || drawnBars) bars.attr('y', d => y(d[key])).attr('height', d => Math.max(0, H - mb - y(d[key])));
       else bars.attr('y', H - mb).attr('height', 0).transition().duration(700).delay((d, i) => i * 40).ease(d3.easeCubicOut).attr('y', d => y(d[key])).attr('height', d => Math.max(0, H - mb - y(d[key])));
     });
@@ -547,11 +547,11 @@
       // 1. Orçamento por mês
       if (!ehRec && sm.limite > 0) {
         const nM = nMesesPeriodo(), lim = sm.limite * nM, fr = lim ? r.total / lim : 0;
-        const cor = fr >= 1 ? '#FF453A' : fr >= 0.8 ? '#FF9F0A' : '#30D158';
+        const cor = fr >= 1 ? 'var(--neg)' : fr >= 0.8 ? '#FF9F0A' : 'var(--pos)';
         const tr = el('div', 'sc-orc'), f = el('i'); f.style.width = Math.min(100, fr * 100) + '%'; f.style.background = cor; tr.append(f);
         tr.setAttribute('role', 'img'); tr.setAttribute('aria-label', 'Gasto ' + eur(r.total) + ' de ' + eur(lim));
         const txt = fr >= 1 ? 'Passou ' + eur(r.total - lim) + ' do limite de ' + eur(lim) : 'Faltam ' + eur(lim - r.total) + ' de ' + eur(lim);
-        const t = el('div', 'sc-orc-t', txt + (nM > 1 ? ' (' + nM + ' meses)' : '')); t.style.color = fr >= 1 ? '#FF453A' : '';
+        const t = el('div', 'sc-orc-t', txt + (nM > 1 ? ' (' + nM + ' meses)' : '')); t.style.color = fr >= 1 ? 'var(--neg)' : '';
         blocos.push(tr, t);
       }
       // 4. Comparar com o mês anterior
@@ -612,7 +612,7 @@
     $('sm-meses').replaceChildren(...meses.map(k => {
       const v = val(k), o = m.get(k), b = el('button', 'sm-row' + (v ? '' : ' zero')); b.type = 'button';
       const topL = el('span', 'sm-top'); topL.append(el('span', 'sm-mes', nomeM(k)), el('span', 'sm-v' + (ehRec && v ? ' pos' : ''), v ? (ehRec ? '+' : '') + eur(v) : '—'));
-      const tr = el('span', 'htr'), f = el('span', 'hfill'); f.style.width = (v ? Math.max(2, v / max * 100) : 0) + '%'; f.style.background = ehRec ? '#30D158' : 'var(--ac)'; tr.append(f);
+      const tr = el('span', 'htr'), f = el('span', 'hfill'); f.style.width = (v ? Math.max(2, v / max * 100) : 0) + '%'; f.style.background = ehRec ? 'var(--pos)' : 'var(--ac)'; tr.append(f);
       b.append(topL, tr, el('span', 'hp', o ? o.n + (o.n === 1 ? ' movimento' : ' movimentos') + (media && v ? ' · ' + (v >= media ? '+' : '−') + eur(Math.abs(v - media)).replace(/^−/, '') + ' face à média' : '') : 'Sem movimentos'));
       b.onclick = () => { fechar('sh-somames'); set({ mes: k, ano: k.slice(0, 4), multi: sm.tags.slice(), tag: '', lista: '' }); irPara('movimentos'); };
       return b;
@@ -651,8 +651,8 @@
   function drawTiles(cs) {
     const total = d3.sum(cs, r => r.saldo), acertadas = cs.filter(r => r.acerto).length;
     $('total-contas').textContent = eur(total);
-    $('ini-total-v').textContent = eur(total); $('ini-total-v').style.color = total < 0 ? '#FF453A' : '';
-    $('total-contas').style.color = total < 0 ? '#FF453A' : '';
+    $('ini-total-v').textContent = eur(total); $('ini-total-v').style.color = total < 0 ? 'var(--neg)' : '';
+    $('total-contas').style.color = total < 0 ? 'var(--hero-neg,var(--neg))' : '';
     const comLim = cs.filter(r => r.limite > 0);
     $('total-limite').hidden = !comLim.length;
     if (comLim.length) $('total-limite').textContent = comLim.map(r => r.conta + ': ainda podes usar ' + eur(Math.max(0, r.disponivel)) + (r.usado > 0 ? ' (já usaste ' + eur(r.usado) + ' dos ' + eur(r.limite) + ' da Conta Ordenado)' : ' (Conta Ordenado por usar)')).join(' · ');
@@ -665,16 +665,16 @@
       let nota = 'Calculado';
       if (r.acerto) { const d = new Date(r.acerto.em); nota = 'Acertado a ' + d.getDate() + ' ' + MES3[d.getMonth()]; }
       if (r.limite > 0) {
-        const v = el('div', 'tile-val', eur(r.disponivel)); if (r.disponivel < 0) v.style.color = '#FF453A';
-        const fr = r.usado / r.limite, cor = fr >= 0.85 ? '#FF453A' : fr >= 0.5 ? '#FF9F0A' : '#30D158';
+        const v = el('div', 'tile-val', eur(r.disponivel)); if (r.disponivel < 0) v.style.color = 'var(--neg)';
+        const fr = r.usado / r.limite, cor = fr >= 0.85 ? 'var(--neg)' : fr >= 0.5 ? '#FF9F0A' : 'var(--pos)';
         const barra = el('div', 'lim-bar'); barra.setAttribute('role', 'img'); barra.setAttribute('aria-label', 'Usado ' + eur(r.usado) + ' de ' + eur(r.limite) + ' da Conta Ordenado');
         const fill = el('i'); fill.style.width = Math.min(100, fr * 100) + '%'; fill.style.background = cor; barra.append(fill);
-        const sv = el('div', 'tile-saldo'); sv.append('Saldo ', Object.assign(el('b', null, eur(r.saldo)), { style: r.saldo < 0 ? 'color:#FF453A' : '' }));
+        const sv = el('div', 'tile-saldo'); sv.append('Saldo ', Object.assign(el('b', null, eur(r.saldo)), { style: r.saldo < 0 ? 'color:var(--neg)' : '' }));
         b.append(ic, el('div', 'tile-name', r.conta), el('div', 'tile-lab', 'Disponível'), v, sv, barra,
           el('div', 'tile-lim', r.usado > 0 ? 'Usado ' + eur(r.usado) + ' de ' + eur(r.limite) + ' (Conta Ordenado)' : 'Conta Ordenado de ' + eur(r.limite) + ' por usar'),
           el('div', 'tile-nota' + (r.acerto ? ' ok' : ''), nota));
       } else {
-        const v = el('div', 'tile-val', eur(r.saldo)); if (r.saldo < 0) v.style.color = '#FF453A';
+        const v = el('div', 'tile-val', eur(r.saldo)); if (r.saldo < 0) v.style.color = 'var(--neg)';
         b.append(ic, el('div', 'tile-name', r.conta), v, el('div', 'tile-nota' + (r.acerto ? ' ok' : ''), nota));
       }
       const e = el('button', 'tile-edit'); e.type = 'button'; e.setAttribute('aria-label', 'Acertar saldo de ' + r.conta);
@@ -720,7 +720,7 @@
     for (let i = 0; i < pri; i++) cel.push(el('span', 'cal-vazio'));
     for (let d = 1; d <= dias; d++) {
       const iso = k + '-' + String(d).padStart(2, '0'), v = porDia.get(iso) || 0, b = el('button', 'cal-d' + (iso === CAL_DIA ? ' on' : ''), String(d)); b.type = 'button';
-      if (v) { const a = 0.18 + 0.82 * Math.sqrt(v / max); b.style.background = 'color-mix(in srgb,var(--ac) ' + Math.round(a * 100) + '%,transparent)'; if (a > 0.55) b.style.color = '#fff'; }
+      if (v) { const a = 0.18 + 0.82 * Math.sqrt(v / max); b.style.background = 'color-mix(in srgb,var(--ac) ' + Math.round(a * 100) + '%,transparent)'; b.style.color = a > 0.6 ? 'var(--ac-txt)' : 'var(--fg)'; }
       b.setAttribute('aria-label', d + ' de ' + MES[mm - 1] + ': ' + (v ? eur(v) : 'sem gastos'));
       b.onclick = () => { CAL_DIA = CAL_DIA === iso ? '' : iso; drawCalendario(); };
       cel.push(b);
@@ -891,7 +891,7 @@
       const c = el('div', 'scard meta'), top = el('div', 'sc-top'); top.append(el('div', 'sc-nome', mt.nome));
       const ed = el('button', 'link', 'Editar'); ed.type = 'button'; ed.onclick = () => abrirMeta(mt); top.append(ed);
       const v = el('div', 'sc-v'); v.append(eur(at), el('span', 'meta-de', ' de ' + eur(mt.alvo)));
-      const tr = el('div', 'sc-orc'), f = el('i'); f.style.width = fr * 100 + '%'; f.style.background = '#30D158'; tr.append(f);
+      const tr = el('div', 'sc-orc'), f = el('i'); f.style.width = fr * 100 + '%'; f.style.background = 'var(--pos)'; tr.append(f);
       const [ay, am] = mt.ate.split('-');
       const sub = falta ? 'Até ' + MES[+am - 1] + ' ' + ay + ' · põe de lado ' + eur(falta / n) + ' por mês' : 'Meta cumprida!';
       const blocos = [top, v, tr, el('div', 'sc-sub', sub), el('div', 'sc-sub', mt.conta ? 'Segue o saldo de ' + mt.conta : 'Valor posto à mão')];
@@ -1079,12 +1079,12 @@
     { id: 'oceano', nome: 'Oceano', page: '#06131f', panel: '#0f2232', fg: '#f2f7fb', muted: '#9db4c6', ac: '#2AC3DE', acTxt: '#00222b', bg: ['#0A84FF', '#2AC3DE', '#1d4ed8'], o: ['#64D2FF', '#0A84FF', '#2AC3DE', '#5E5CE6'], esc: 1 },
     { id: 'grafite', nome: 'Grafite', page: '#101012', panel: '#1c1c1f', fg: '#f5f5f7', muted: '#a1a1a6', ac: '#C6F432', acTxt: '#111', bg: ['#636366', '#3a3a3c', '#48484a'], o: ['#3a3a3c', '#48484a', '#2c2c2e', '#3a3a3c'], esc: 1 },
     { id: 'neon', nome: 'Meia-noite neon', page: '#05060a', panel: '#10111a', fg: '#f5f7ff', muted: '#8f93a8', ac: '#00E5FF', acTxt: '#001018', bg: ['#00E5FF', '#FF2E93', '#6d28d9'], o: ['#00E5FF', '#FF2E93', '#6d28d9', '#00E5FF'], esc: 1 },
-    { id: 'aveia', nome: 'Aveia', nuvi: 1, page: '#f7f3ec', panel: '#ffffff', fg: '#1d1a1f', muted: '#6c6670', ac: '#8f7d5e', acTxt: '#fff', bc: 'rgba(163,145,113,.5)', g: 'linear-gradient(135deg,#e2d7c2,#b6a584)', hero: '#33291a', soft: '#efe7da', d: ['#f7f3ec', '#33291a', '#8f7d5e'] },
-    { id: 'teal', nome: 'Carvão e marinho', nuvi: 1, page: '#fbf7f1', panel: '#ffffff', fg: '#3d3636', muted: '#7a7070', ac: '#dba583', acTxt: '#202d5f', bc: 'rgba(32,45,95,.28)', g: 'linear-gradient(135deg,#2e3d78,#202d5f)', hero: '#fbf7f1', soft: '#e9e6ef', d: ['#f1ebe3', '#202d5f', '#dba583'] },
-    { id: 'pink', nome: 'Creme e tinta', nuvi: 1, page: '#fbf7f0', panel: '#ffffff', fg: '#1b1a20', muted: '#6a6670', ac: '#e2457f', acTxt: '#fff', bc: 'rgba(27,26,32,.22)', g: 'linear-gradient(135deg,#2e2c35,#1b1a20)', hero: '#fbf7f0', soft: '#f6e4ea', d: ['#f3ece1', '#1b1a20', '#e2457f'] },
-    { id: 'green', nome: 'Verde-garrafa', nuvi: 1, page: '#f7f4ec', panel: '#ffffff', fg: '#123d2c', muted: '#5b6f63', ac: '#e2402b', acTxt: '#fff', bc: 'rgba(18,61,44,.26)', g: 'linear-gradient(135deg,#1f5a41,#123d2c)', hero: '#f7f4ec', soft: '#e3ebe2', d: ['#ebe5d7', '#123d2c', '#e2402b'] },
-    { id: 'sand', nome: 'Areia e terracota', nuvi: 1, page: '#faf3e7', panel: '#ffffff', fg: '#3b2a22', muted: '#7d6656', ac: '#2450c8', acTxt: '#fff', bc: 'rgba(184,92,58,.4)', g: 'linear-gradient(135deg,#cc6b47,#a84e30)', hero: '#fff6ec', soft: '#f3dccf', d: ['#efe2cd', '#a84e30', '#2450c8'] },
-    { id: 'indigo', nome: 'Índigo e celadon', nuvi: 1, page: '#f1f6f0', panel: '#ffffff', fg: '#2a2868', muted: '#5f6189', ac: '#c39a1e', acTxt: '#1f1d4f', bc: 'rgba(42,40,104,.25)', g: 'linear-gradient(135deg,#3d3b8f,#2a2868)', hero: '#f1f6f0', soft: '#e8e8f3', d: ['#dbe8dc', '#2a2868', '#c39a1e'] }];
+    { id: 'aveia', ink: '#6e5e43', hneg: '#9b1c1c', nome: 'Aveia', nuvi: 1, page: '#f7f3ec', panel: '#ffffff', fg: '#1d1a1f', muted: '#6c6670', ac: '#8f7d5e', acTxt: '#fff', bc: 'rgba(163,145,113,.5)', g: 'linear-gradient(135deg,#e2d7c2,#b6a584)', hero: '#33291a', soft: '#efe7da', d: ['#f7f3ec', '#33291a', '#8f7d5e'] },
+    { id: 'teal', ink: '#202d5f', hneg: '#ffb4ab', nome: 'Carvão e marinho', nuvi: 1, page: '#fbf7f1', panel: '#ffffff', fg: '#3d3636', muted: '#7a7070', ac: '#dba583', acTxt: '#202d5f', bc: 'rgba(32,45,95,.28)', g: 'linear-gradient(135deg,#2e3d78,#202d5f)', hero: '#fbf7f1', soft: '#e9e6ef', d: ['#f1ebe3', '#202d5f', '#dba583'] },
+    { id: 'pink', ink: '#c2185b', hneg: '#ffb4ab', nome: 'Creme e tinta', nuvi: 1, page: '#fbf7f0', panel: '#ffffff', fg: '#1b1a20', muted: '#6a6670', ac: '#e2457f', acTxt: '#fff', bc: 'rgba(27,26,32,.22)', g: 'linear-gradient(135deg,#2e2c35,#1b1a20)', hero: '#fbf7f0', soft: '#f6e4ea', d: ['#f3ece1', '#1b1a20', '#e2457f'] },
+    { id: 'green', ink: '#b8321f', hneg: '#ffb4ab', nome: 'Verde-garrafa', nuvi: 1, page: '#f7f4ec', panel: '#ffffff', fg: '#123d2c', muted: '#5b6f63', ac: '#e2402b', acTxt: '#fff', bc: 'rgba(18,61,44,.26)', g: 'linear-gradient(135deg,#1f5a41,#123d2c)', hero: '#f7f4ec', soft: '#e3ebe2', d: ['#ebe5d7', '#123d2c', '#e2402b'] },
+    { id: 'sand', ink: '#2450c8', hneg: '#fff0e6', nome: 'Areia e terracota', nuvi: 1, page: '#faf3e7', panel: '#ffffff', fg: '#3b2a22', muted: '#7d6656', ac: '#2450c8', acTxt: '#fff', bc: 'rgba(184,92,58,.4)', g: 'linear-gradient(135deg,#cc6b47,#a84e30)', hero: '#fff6ec', soft: '#f3dccf', d: ['#efe2cd', '#a84e30', '#2450c8'] },
+    { id: 'indigo', ink: '#2a2868', hneg: '#ffb4ab', nome: 'Índigo e celadon', nuvi: 1, page: '#f1f6f0', panel: '#ffffff', fg: '#2a2868', muted: '#5f6189', ac: '#c39a1e', acTxt: '#1f1d4f', bc: 'rgba(42,40,104,.25)', g: 'linear-gradient(135deg,#3d3b8f,#2a2868)', hero: '#f1f6f0', soft: '#e8e8f3', d: ['#dbe8dc', '#2a2868', '#c39a1e'] }];
   const TEMA_ANTIGO = { areia: 'sand', menta: 'green', papel: 'aveia', floresta: 'green', lavanda: 'indigo', cereja: 'pink' };
   TEMAS.forEach(t => { if (!t.d) t.d = [t.panel, t.ac, t.bg[1]]; });
   function aplicaTema(id) {
@@ -1093,11 +1093,13 @@
     let css = '';
     if (t.page) {
       css = ':root{color-scheme:' + (t.esc ? 'dark' : 'light') + ';--page:' + t.page + ';--panel:' + t.panel + ';--fg:' + t.fg + ';--muted:' + t.muted + ';--line:' + (t.esc ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)') + ';--ac:' + t.ac + ';--ac-txt:' + t.acTxt;
-      if (t.nuvi) css += ';--bc:' + t.bc + ';--g:' + t.g + ';--hero-ink:' + t.hero + ';--th-soft:' + t.soft + ';--orb-op:0;--bg1:' + t.page + ';--bg2:' + t.page + ';--bg3:' + t.page;
+      if (t.nuvi) css += ';--ac-ink:' + t.ink + ';--hero-neg:' + t.hneg + ';--bc:' + t.bc + ';--g:' + t.g + ';--hero-ink:' + t.hero + ';--th-soft:' + t.soft + ';--orb-op:0;--bg1:' + t.page + ';--bg2:' + t.page + ';--bg3:' + t.page;
       else css += ';--bg1:' + t.bg[0] + ';--bg2:' + t.bg[1] + ';--bg3:' + t.bg[2] + ';--o1:' + t.o[0] + ';--o2:' + t.o[1] + ';--o3:' + t.o[2] + ';--o4:' + t.o[3];
       css += '}';
     }
     st.textContent = css;
+    // os temas claros/escuros mandam também nos ecrãs que seguiam o modo do iPhone (ecrã do saldo, teclado, formulário)
+    if (t.page) document.documentElement.dataset.esc = t.esc ? 'dark' : 'light'; else delete document.documentElement.dataset.esc;
     // cor da barra das horas no iPhone = fundo do tema
     requestAnimationFrame(() => { const cor = getComputedStyle(document.documentElement).getPropertyValue('--page').trim() || '#f6efe9'; document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = cor; }); });
     $('temas').querySelectorAll('.tema').forEach(b => b.setAttribute('aria-checked', String(b.dataset.id === t.id)));
@@ -1124,7 +1126,7 @@
     for (const [nome, f, maisBom] of linhas) {
       const vs = anos.map(a => f(por.get(a) || [])); if (!vs.some(Boolean)) continue;
       const tr = el('tr'); tr.append(el('td', '', nome), ...vs.map(v => el('td', '', v ? eur0(v) : '—')));
-      if (anos.length > 1) { const d = vs[vs.length - 1] - vs[vs.length - 2], bom = maisBom ? d >= 0 : d <= 0; const td = el('td', '', (d > 0 ? '+' : d < 0 ? '−' : '') + eur0(Math.abs(d))); td.style.color = Math.abs(d) < 1 ? '' : bom ? '#30D158' : '#FF453A'; tr.append(td); }
+      if (anos.length > 1) { const d = vs[vs.length - 1] - vs[vs.length - 2], bom = maisBom ? d >= 0 : d <= 0; const td = el('td', '', (d > 0 ? '+' : d < 0 ? '−' : '') + eur0(Math.abs(d))); td.style.color = Math.abs(d) < 1 ? '' : bom ? 'var(--pos)' : 'var(--neg)'; tr.append(td); }
       tb.append(tr);
     }
     $('anos').replaceChildren(tb, ...(anos.length < 2 ? [el('p', 'hint', 'Por agora só há dados de ' + (anos[0] || 'um ano') + '. Quando chegarem dados de outro ano, aparecem aqui lado a lado.')] : []));
