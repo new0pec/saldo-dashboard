@@ -998,7 +998,7 @@
     const mudou = t !== TAB; TAB = t; store.set('saldo.tab', t);
     try { history.replaceState(null, '', '#' + t); } catch (e) {}
     aplicaTab();
-    if (mudou) window.scrollTo(0, 0);
+    if (mudou) { const pg = document.querySelector('main.ios'); if (pg) pg.scrollTop = 0; }
   }
   // O Safari no iPhone às vezes engole o "click" (ao tocar durante o deslizar da página ou junto à barra de baixo).
   // Por isso o menu reage logo ao levantar o dedo, e o click fica como reserva.
@@ -1147,12 +1147,10 @@
     clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, erro ? 6000 : 2600);
   }
   // Enquanto há uma folha aberta, a página de trás não rola (iOS incluído)
-  let scrollGuardado = 0;
   function bloquearFundo() {
-    const aberta = [...document.querySelectorAll('.sheet-wrap, .tv')].some(w => !w.hidden);
+    const aberta = [...document.querySelectorAll('.sheet-wrap, .tv, .story')].some(w => !w.hidden);
     const b = document.body;
-    if (aberta && !b.classList.contains('bloqueado')) { scrollGuardado = window.scrollY; b.style.top = -scrollGuardado + 'px'; b.classList.add('bloqueado'); }
-    else if (!aberta && b.classList.contains('bloqueado')) { b.classList.remove('bloqueado'); b.style.top = ''; window.scrollTo(0, scrollGuardado); }
+    b.classList.toggle('bloqueado', aberta);
   }
   new MutationObserver(bloquearFundo).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
   const abrir = id => { $(id).hidden = false; };
