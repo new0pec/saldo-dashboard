@@ -193,7 +193,7 @@
   const MAN_KEY = 'saldo.manuais';
   const normaliza = o => {
     o = o && typeof o === 'object' ? o : {};
-    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {}, capas: o.capas && typeof o.capas === 'object' ? o.capas : {}, limites: o.limites && typeof o.limites === 'object' ? o.limites : {}, regras: o.regras && typeof o.regras === 'object' ? o.regras : {}, listas: Array.isArray(o.listas) ? o.listas : [], somas: Array.isArray(o.somas) ? o.somas : [] };
+    return { versao: 1, movimentos: Array.isArray(o.movimentos) ? o.movimentos : [], grupos: o.grupos && typeof o.grupos === 'object' ? o.grupos : {}, contas: Array.isArray(o.contas) ? o.contas : [], saldos: o.saldos && typeof o.saldos === 'object' ? o.saldos : {}, capas: o.capas && typeof o.capas === 'object' ? o.capas : {}, limites: o.limites && typeof o.limites === 'object' ? o.limites : {}, regras: o.regras && typeof o.regras === 'object' ? o.regras : {}, listas: Array.isArray(o.listas) ? o.listas : [], somas: Array.isArray(o.somas) ? o.somas : [], metas: Array.isArray(o.metas) ? o.metas : [], tagsMov: o.tagsMov && typeof o.tagsMov === 'object' ? o.tagsMov : {}, fixosOff: Array.isArray(o.fixosOff) ? o.fixosOff : [] };
   };
   function migraNomes(o) {
     o.movimentos.forEach(m => { if (m) m.conta = nomeConta(m.conta); });
@@ -234,7 +234,15 @@
     const man = M.movimentos.filter(m => m && /^\d{4}-\d{2}-\d{2}$/.test(m.data)).flatMap(m => ocorrencias(m).map((data, k) => ({
       id: m.id, data, mes: data.slice(0, 7), montante: +m.montante, conta: m.conta, categoria: m.categoria, etiquetas: m.etiquetas || '',
       tipo: m.tipo, grupo: grupoDe(m.categoria, m.etiquetas, m.tipo), manual: true, serie: !!m.repetir && m.repetir !== 'nunca' })));
-    S.rows = base.concat(man).map(r => ({ ...r, tags: tagsDe(r.etiquetas, r.categoria), ftags: [...new Set(String(r.etiquetas || '').split(',').map(t => t.replace(/^#+/, '').trim()).filter(Boolean))] }));
+    const vistos = new Map(), extra = M.tagsMov || {};
+    S.rows = base.concat(man).map(r => {
+      // chave estável para guardar hashtags postas na app (ideia 8)
+      const kb = r.manual ? 'm:' + r.id + ':' + r.data : [r.data, r.conta, r.montante, r.categoria].join('|');
+      const n = (vistos.get(kb) || 0) + 1; vistos.set(kb, n);
+      const key = kb + '#' + n, mais = Array.isArray(extra[key]) ? extra[key] : [];
+      const ft = [...new Set(String(r.etiquetas || '').split(',').map(t => t.replace(/^#+/, '').trim()).filter(Boolean).concat(mais))];
+      return { ...r, key, tags: [...new Set(tagsDe(r.etiquetas, r.categoria).concat(mais))], ftags: ft };
+    });
     if (S.lista && !listaAtiva()) S.lista = '';
   }
   async function loadManuais() {
@@ -369,6 +377,11 @@
     drawList();
     drawUltimos();
     drawRapido();
+    drawFixos();
+    drawPrevisao();
+    drawSemTag();
+    drawMetas();
+    drawSemana();
     drawCalendario();
     if ($('pg-q').value) pesquisaGlobal($('pg-q').value);
     drawListas();
@@ -714,6 +727,226 @@
       return b;
     }));
   }
+
+  // ---------- 6. Pagamentos fixos (e receitas fixas) ----------
+  const pad2 = n => String(n).padStart(2, '0');
+  const diasEntre = (a, b) => Math.round((new Date(b + 'T12:00') - new Date(a + 'T12:00')) / 864e5);
+  function fixos(tipo) {
+    tipo = tipo || 'Despesa';
+    const hj = hoje(), mA = hj.slice(0, 7), ult = []; let k = mA;
+    for (let i = 0; i < 6; i++) { k = prevMes(k); ult.push(k); }
+    const by = new Map();
+    for (const r of S.rows) if (r.tipo === tipo && (!S.conta || r.conta === S.conta)) { if (!by.has(r.categoria)) by.set(r.categoria, []); by.get(r.categoria).push(r); }
+    const out = [];
+    for (const [cat, rs] of by) {
+      if ((M.fixosOff || []).includes(cat)) continue;
+      const pm = d3.rollup(rs.filter(r => ult.includes(r.mes)), v => ({ v: Math.abs(d3.sum(v, r => r.montante)), dia: d3.median(v, r => +r.data.slice(8)), n: v.length }), r => r.mes);
+      if (pm.size < 3 || ult.slice(0, 4).filter(m => pm.has(m)).length < 3) continue;
+      const vals = [...pm.values()];
+      if (d3.mean(vals, x => x.n) > 2.5) continue;
+      const vs = vals.map(x => x.v), med = d3.median(vs), dev = d3.deviation(vs) || 0;
+      if (!(med > 0) || dev / med > 0.35) continue;
+      const dia = Math.round(d3.median(vals, x => x.dia)), pago = rs.some(r => r.mes === mA);
+      let [y, m] = mA.split('-').map(Number); if (pago) { m++; if (m > 12) { m = 1; y++; } }
+      const prox = y + '-' + pad2(m) + '-' + pad2(Math.min(dia, new Date(y, m, 0).getDate()));
+      const recente = rs.slice().sort((a, b) => b.data.localeCompare(a.data))[0];
+      out.push({ cat, valor: med, dia, prox, pago, conta: recente.conta, grupo: recente.grupo, dias: diasEntre(hj, prox) });
+    }
+    return out.sort((a, b) => a.prox.localeCompare(b.prox));
+  }
+  function drawFixos() {
+    const fx = fixos(), hj = hoje();
+    if (!fx.length) { $('fixos').replaceChildren(el('p', 'empty', 'Ainda não encontrei pagamentos que se repitam todos os meses.')); $('fixos-tot').textContent = ''; return; }
+    const quando = f => f.dias < 0 ? 'devia ter sido a ' + (+f.prox.slice(8)) + ' ' + MES3[+f.prox.slice(5, 7) - 1] : f.dias === 0 ? 'hoje' : f.dias === 1 ? 'amanhã' : 'em ' + f.dias + ' dias';
+    $('fixos').replaceChildren(...fx.slice(0, 8).map(f => {
+      const row = el('div', 'fx' + (f.dias < 0 ? ' atraso' : '')), ic = el('span', 'rq-ico', ico(f.cat)); ic.style.background = gcol(f.grupo); aplicaCapa(ic, f.cat);
+      const t = el('span', 'rq-t'); t.append(el('b', '', f.cat), el('small', '', f.dias < 0 ? 'Esperado a ' + (+f.prox.slice(8)) + ' ' + MES3[+f.prox.slice(5, 7) - 1] + ' · ainda não apareceu' : (+f.prox.slice(8)) + ' ' + MES3[+f.prox.slice(5, 7) - 1] + ' · ' + quando(f)));
+      const x = el('button', 'fx-x', '×'); x.type = 'button'; x.setAttribute('aria-label', 'Não é um pagamento fixo: ' + f.cat);
+      x.onclick = () => { if (!window.confirm('Deixar de mostrar ' + f.cat + ' como pagamento fixo?')) return; M.fixosOff = (M.fixosOff || []).concat(f.cat); saveManuais('Removido dos pagamentos fixos'); };
+      row.append(ic, t, el('b', 'fx-v', '≈ ' + eur(f.valor)), x); return row;
+    }));
+    const falta = d3.sum(fx.filter(f => !f.pago), f => f.valor), prox = d3.sum(fx, f => f.valor);
+    $('fixos-tot').textContent = (falta ? 'Ainda este mês: ' + eur(falta) + ' · ' : 'Este mês já está tudo pago · ') + 'Por mês: ' + eur(prox);
+  }
+
+  // ---------- 7. Previsão do fim do mês ----------
+  function drawPrevisao() {
+    const hj = hoje(), mA = hj.slice(0, 7), card = $('previsao');
+    const rows = S.rows.filter(r => r.mes === mA && r.data <= hj && r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta));
+    if (!rows.length) { card.classList.add('fora-dados'); return; }
+    card.classList.remove('fora-dados');
+    const fxD = fixos('Despesa'), fxR = fixos('Receita'), cats = new Set(fxD.map(f => f.cat));
+    const gasto = -d3.sum(rows.filter(r => r.tipo === 'Despesa'), r => r.montante);
+    const variavel = -d3.sum(rows.filter(r => r.tipo === 'Despesa' && !cats.has(r.categoria)), r => r.montante);
+    const dia = +hj.slice(8), dim = new Date(+mA.slice(0, 4), +mA.slice(5, 7), 0).getDate();
+    const pend = d3.sum(fxD.filter(f => !f.pago), f => f.valor), recPend = d3.sum(fxR.filter(f => !f.pago), f => f.valor);
+    const prev = gasto + variavel / dia * (dim - dia) + pend;
+    const rec = d3.sum(rows.filter(r => r.tipo === 'Receita'), r => r.montante) + recPend, sobra = rec - prev;
+    const lin = (a, b, cls) => { const d = el('div', 'pv-l'); d.append(el('span', '', a), el('b', cls || '', b)); return d; };
+    const tr = el('div', 'sc-orc'), f = el('i'); f.style.width = Math.min(100, prev ? gasto / prev * 100 : 0) + '%'; f.style.background = '#FF9F0A'; tr.append(f);
+    $('pv-corpo').replaceChildren(
+      lin('Gasto até hoje (dia ' + dia + ')', eur(gasto)),
+      lin('Previsão até dia ' + dim, eur(prev)), tr,
+      lin('Receitas do mês' + (recPend ? ' (com as que faltam)' : ''), '+' + eur(rec)),
+      lin(sobra >= 0 ? 'Vai sobrar' : 'Vai faltar', eur(Math.abs(sobra)), sobra >= 0 ? 'pv-bom' : 'pv-mau'),
+      el('p', 'hint', 'Conta o ritmo dos gastos do dia a dia até agora' + (pend ? ' e ' + eur(pend) + ' de pagamentos fixos que ainda faltam' : '') + '.'));
+  }
+
+  // ---------- 8. Arrumar movimentos sem hashtag ----------
+  let AR = null, arTimer = null;
+  const semHashtag = () => rowsPeriodo().filter(r => !(r.ftags || []).length && !(r.key in (M.tagsMov || {}))).sort((a, b) => b.data.localeCompare(a.data));
+  function drawSemTag() {
+    const n = semHashtag().length;
+    $('semtag-card').classList.toggle('fora-dados', !n);
+    $('semtag-n').textContent = n + (n === 1 ? ' movimento sem hashtag' : ' movimentos sem hashtag') + ' neste período';
+  }
+  function guardaTagsDepois() { clearTimeout(arTimer); arTimer = setTimeout(() => saveManuais('Hashtags guardadas'), 1500); }
+  function abrirArrumar() { AR = { fila: semHashtag(), i: 0, feitos: 0 }; abrir('sh-arrumar'); arDesenha(); }
+  function arDesenha() {
+    const box = $('ar-corpo');
+    if (!AR || AR.i >= AR.fila.length) {
+      box.replaceChildren(el('p', 'ar-fim', AR && AR.feitos ? 'Tudo arrumado. ' + AR.feitos + (AR.feitos === 1 ? ' movimento ficou' : ' movimentos ficaram') + ' com hashtag.' : 'Não há movimentos sem hashtag neste período.'));
+      $('ar-prog').textContent = ''; return;
+    }
+    const r = AR.fila[AR.i];
+    $('ar-prog').textContent = (AR.i + 1) + ' de ' + AR.fila.length;
+    const mv = el('div', 'ar-mv'), ic = el('span', 'rq-ico', ico(r.categoria)); ic.style.background = gcol(r.grupo); aplicaCapa(ic, r.categoria);
+    const t = el('span', 'rq-t'); t.append(el('b', '', r.categoria), el('small', '', (+r.data.slice(8)) + ' ' + MES3[+r.data.slice(5, 7) - 1] + ' ' + r.data.slice(0, 4) + ' · ' + r.conta));
+    mv.append(ic, t, el('b', 'fx-v' + (r.montante > 0 ? ' pv-bom' : ''), (r.montante > 0 ? '+' : '') + eur(r.montante)));
+    // sugestões: hashtags usadas no mesmo comerciante, depois as mais usadas
+    const cnt = new Map(), glob = new Map();
+    for (const x of S.rows) for (const tg of x.ftags || []) { glob.set(tg, (glob.get(tg) || 0) + 1); if (x.categoria === r.categoria) cnt.set(tg, (cnt.get(tg) || 0) + 1); }
+    const sug = [...cnt].sort((a, b) => b[1] - a[1]).map(x => x[0]);
+    for (const [tg] of [...glob].sort((a, b) => b[1] - a[1])) { if (sug.length >= 8) break; if (!sug.includes(tg)) sug.push(tg); }
+    const chips = el('div', 'lchips wrap'), q = $('ar-q');
+    const por = tg => { M.tagsMov = M.tagsMov || {}; M.tagsMov[r.key] = [tg]; AR.feitos++; AR.i++; q.value = ''; compose(); arDesenha(); guardaTagsDepois(); };
+    const mostra = () => {
+      const k = semAc(q.value.trim()), todas = [...glob.keys()];
+      const lista = k ? todas.filter(tg => semAc(tg).includes(k)).slice(0, 12) : sug;
+      const bs = lista.map(tg => { const b = el('button', 'lchip', '#' + tg); b.type = 'button'; b.onclick = () => por(tg); return b; });
+      const novo = q.value.trim().replace(/^#+/, '');
+      if (novo && !todas.some(tg => semAc(tg) === semAc(novo))) { const b = el('button', 'lchip on', '+ Criar #' + novo); b.type = 'button'; b.onclick = () => por(novo); bs.unshift(b); }
+      chips.replaceChildren(...bs);
+    };
+    q.oninput = mostra; mostra();
+    box.replaceChildren(mv, el('h3', 'sh-sub', 'Sugestões'), chips);
+  }
+  $('ar-saltar').addEventListener('click', () => { if (AR) { AR.i++; arDesenha(); } });
+  $('ar-nao').addEventListener('click', () => { if (!AR || AR.i >= AR.fila.length) return; M.tagsMov = M.tagsMov || {}; M.tagsMov[AR.fila[AR.i].key] = []; AR.i++; arDesenha(); guardaTagsDepois(); });
+  $('ar-fechar').addEventListener('click', () => { fechar('sh-arrumar'); if (arTimer) { clearTimeout(arTimer); saveManuais('Hashtags guardadas'); arTimer = null; } });
+  $('semtag-btn').addEventListener('click', abrirArrumar);
+
+  // ---------- 9. Metas de poupança ----------
+  let ME = null;
+  const mesesAte = ate => { const [y, m] = hoje().split('-').map(Number), [y2, m2] = ate.split('-').map(Number); return Math.max(1, (y2 - y) * 12 + (m2 - m) + 1); };
+  const atualMeta = mt => mt.conta ? ((contas().find(c => c.conta === mt.conta) || {}).saldo || 0) : (+mt.guardado || 0);
+  function drawMetas() {
+    const ms = M.metas || [];
+    if (!ms.length) { $('metas').replaceChildren(el('p', 'empty', 'Crie uma meta, por exemplo Férias de verão, 1 500 € até julho.')); return; }
+    $('metas').replaceChildren(...ms.map(mt => {
+      const at = Math.max(0, atualMeta(mt)), fr = mt.alvo ? Math.min(1, at / mt.alvo) : 0, falta = Math.max(0, mt.alvo - at), n = mesesAte(mt.ate);
+      const c = el('div', 'scard meta'), top = el('div', 'sc-top'); top.append(el('div', 'sc-nome', mt.nome));
+      const ed = el('button', 'link', 'Editar'); ed.type = 'button'; ed.onclick = () => abrirMeta(mt); top.append(ed);
+      const v = el('div', 'sc-v'); v.append(eur(at), el('span', 'meta-de', ' de ' + eur(mt.alvo)));
+      const tr = el('div', 'sc-orc'), f = el('i'); f.style.width = fr * 100 + '%'; f.style.background = '#30D158'; tr.append(f);
+      const [ay, am] = mt.ate.split('-');
+      const sub = falta ? 'Até ' + MES[+am - 1] + ' ' + ay + ' · ponha de lado ' + eur(falta / n) + ' por mês' : 'Meta cumprida!';
+      const blocos = [top, v, tr, el('div', 'sc-sub', sub), el('div', 'sc-sub', mt.conta ? 'Segue o saldo de ' + mt.conta : 'Valor posto à mão')];
+      if (!mt.conta) { const b = el('button', 'hs-b meta-add', '+ Pôr de lado'); b.type = 'button'; b.onclick = () => { const t = window.prompt('Quanto pôs de lado para ' + mt.nome + '? (€)'); if (t == null) return; const x = +t.replace(/\s|€/g, '').replace(/\./g, '').replace(',', '.'); if (!(x > 0 || x < 0)) return; mt.guardado = Math.round(((+mt.guardado || 0) + x) * 100) / 100; saveManuais('Meta atualizada'); }; blocos.push(b); }
+      c.append(...blocos); return c;
+    }));
+  }
+  function abrirMeta(mt) {
+    ME = mt || null;
+    $('me-title').textContent = mt ? 'Editar meta' : 'Nova meta';
+    $('me-nome').value = mt ? mt.nome : '';
+    $('me-alvo').value = mt ? String(mt.alvo).replace('.', ',') : '';
+    const d = new Date(); d.setMonth(d.getMonth() + 6);
+    $('me-ate').value = mt ? mt.ate : d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+    $('me-conta').replaceChildren(el('option', '', 'Nenhuma (ponho o valor à mão)'), ...listaContas().map(c => { const o = el('option', '', c); o.value = c; return o; }));
+    $('me-conta').options[0].value = ''; $('me-conta').value = mt && mt.conta ? mt.conta : '';
+    $('me-guard').value = mt && mt.guardado ? String(mt.guardado).replace('.', ',') : '';
+    $('me-guard-row').hidden = !!$('me-conta').value;
+    $('me-del').hidden = !mt; $('me-msg').textContent = '';
+    abrir('sh-meta');
+  }
+  $('me-conta').addEventListener('change', () => { $('me-guard-row').hidden = !!$('me-conta').value; });
+  const numPT = t => { t = String(t || '').trim().replace(/\s|€/g, '').replace(/\./g, '').replace(',', '.'); return t ? +t : 0; };
+  $('me-ok').addEventListener('click', () => {
+    const nome = $('me-nome').value.trim(), alvo = numPT($('me-alvo').value), ate = $('me-ate').value;
+    if (!nome) { $('me-msg').textContent = 'Dê um nome à meta.'; return; }
+    if (!(alvo > 0)) { $('me-msg').textContent = 'Escreva o valor que quer juntar, por exemplo 1500.'; return; }
+    if (!/^\d{4}-\d{2}$/.test(ate)) { $('me-msg').textContent = 'Escolha até quando.'; return; }
+    const mt = { id: ME ? ME.id : novoId(), nome, alvo, ate, conta: $('me-conta').value || '', guardado: $('me-conta').value ? 0 : numPT($('me-guard').value) };
+    const l = M.metas || [], i = l.findIndex(x => x.id === mt.id);
+    M.metas = i >= 0 ? l.map(x => x.id === mt.id ? mt : x) : l.concat(mt);
+    fechar('sh-meta'); saveManuais(ME ? 'Meta atualizada' : 'Meta «' + nome + '» criada');
+  });
+  $('me-del').addEventListener('click', () => { if (!ME || !window.confirm('Apagar esta meta?')) return; M.metas = (M.metas || []).filter(x => x.id !== ME.id); fechar('sh-meta'); saveManuais('Meta apagada'); });
+  $('nova-meta').addEventListener('click', () => abrirMeta(null));
+
+  // ---------- 10. Resumo da semana ----------
+  const isoDia2 = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  function semanaRef() {
+    const d = new Date(hoje() + 'T12:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7);
+    const desp = S.rows.filter(r => r.tipo === 'Despesa' && (!S.conta || r.conta === S.conta));
+    for (let i = 0; i < 12; i++) {
+      const ini = isoDia2(d), f = new Date(d); f.setDate(f.getDate() + 6); const fim = isoDia2(f);
+      if (desp.some(r => r.data >= ini && r.data <= fim)) return { ini, fim };
+      d.setDate(d.getDate() - 7);
+    }
+    return null;
+  }
+  function slidesSemana() {
+    const w = semanaRef(); if (!w) return null;
+    const desp = S.rows.filter(r => r.tipo === 'Despesa' && (!S.conta || r.conta === S.conta));
+    const pIni = new Date(w.ini + 'T12:00'); pIni.setDate(pIni.getDate() - 7); const pFim = new Date(w.ini + 'T12:00'); pFim.setDate(pFim.getDate() - 1);
+    const sem = desp.filter(r => r.data >= w.ini && r.data <= w.fim), ant = desp.filter(r => r.data >= isoDia2(pIni) && r.data <= isoDia2(pFim));
+    const tot = -d3.sum(sem, r => r.montante), tA = -d3.sum(ant, r => r.montante);
+    const fmt = x => (+x.slice(8)) + ' ' + MES3[+x.slice(5, 7) - 1];
+    const sl = [];
+    const dif = tA ? Math.round((tot - tA) / tA * 100) : null;
+    sl.push(['Semana de ' + fmt(w.ini) + ' a ' + fmt(w.fim), 'Gastou ' + eur(tot), dif == null ? sem.length + ' movimentos' : Math.abs(dif) + '% ' + (dif <= 0 ? 'menos' : 'mais') + ' do que na semana anterior (' + eur(tA) + ')']);
+    const porTag = new Map(); for (const r of sem) for (const t of (r.ftags.length ? r.ftags : [r.categoria])) { const o = porTag.get(t) || { v: 0, n: 0 }; o.v -= r.montante; o.n++; porTag.set(t, o); }
+    const tt = [...porTag].sort((a, b) => b[1].v - a[1].v)[0];
+    if (tt) sl.push(['Onde foi mais', (S.rows.some(r => (r.ftags || []).includes(tt[0])) ? '#' : '') + tt[0] + ' · ' + eur(tt[1].v), tt[1].n + (tt[1].n === 1 ? ' movimento' : ' movimentos') + ' · ' + Math.round(tt[1].v / (tot || 1) * 100) + '% da semana']);
+    const porDia = d3.rollup(sem, v => -d3.sum(v, r => r.montante), r => r.data), dd = [...porDia].sort((a, b) => b[1] - a[1])[0];
+    if (dd) { const nd = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][new Date(dd[0] + 'T12:00').getDay()];
+      const cats = [...d3.rollup(sem.filter(r => r.data === dd[0]), v => -d3.sum(v, r => r.montante), r => r.categoria)].sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
+      sl.push(['Dia mais caro', nd + ' · ' + eur(dd[1]), cats.join(' e ')]); }
+    const comLim = (M.somas || []).filter(sm => sm.limite > 0);
+    if (comLim.length) {
+      const mA = w.fim.slice(0, 7), rowsM = S.rows.filter(r => r.mes === mA && r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta));
+      const passou = comLim.filter(sm => somaTags(sm.tags, rowsM).total > sm.limite);
+      sl.push([passou.length ? 'Atenção aos orçamentos' : 'Bom trabalho', (comLim.length - passou.length) + ' de ' + comLim.length + ' orçamentos dentro do limite', passou.length ? 'Passou: ' + passou.map(x => x.nome).join(', ') : 'Em ' + MES[+mA.slice(5, 7) - 1] + ', até agora']);
+    } else {
+      const rec = d3.sum(S.rows.filter(r => r.tipo === 'Receita' && r.data >= w.ini && r.data <= w.fim && (!S.conta || r.conta === S.conta)), r => r.montante);
+      sl.push(['Entrou na semana', '+' + eur(rec), 'Ponha limites nas Somas guardadas para ver aqui os orçamentos']);
+    }
+    return { w, sl };
+  }
+  let ST = null;
+  function drawSemana() {
+    const x = slidesSemana(); $('semana-card').classList.toggle('fora-dados', !x); if (!x) return;
+    const fmt = d => (+d.slice(8)) + ' ' + MES3[+d.slice(5, 7) - 1];
+    $('semana-sub').textContent = fmt(x.w.ini) + ' a ' + fmt(x.w.fim) + ' · ' + x.sl[0][1];
+    $('semana-novo').hidden = new Date().getDay() !== 1;
+  }
+  function abrirStory() { const x = slidesSemana(); if (!x) return; ST = { sl: x.sl, i: 0 }; $('story').hidden = false; storyDesenha(); }
+  function storyDesenha() {
+    const [a, b, c] = ST.sl[ST.i];
+    $('st-dots').replaceChildren(...ST.sl.map((_, i) => el('i', i <= ST.i ? 'on' : '')));
+    $('st-a').textContent = a; $('st-b').textContent = b; $('st-c').textContent = c;
+    $('st-dica').textContent = ST.i < ST.sl.length - 1 ? 'Toque à direita para continuar' : 'Toque para fechar';
+  }
+  $('semana-card').addEventListener('click', abrirStory);
+  $('st-x').addEventListener('click', e => { e.stopPropagation(); $('story').hidden = true; });
+  $('story').addEventListener('click', e => {
+    if (!ST) return; const esq = e.clientX < window.innerWidth / 3;
+    if (esq) ST.i = Math.max(0, ST.i - 1); else if (ST.i < ST.sl.length - 1) ST.i++; else { $('story').hidden = true; return; }
+    storyDesenha();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('story').hidden) $('story').hidden = true; });
 
   function drawUltimos() {
     const rows = S.rows.filter(r => !S.conta || r.conta === S.conta).slice().sort((a, b) => a.data < b.data ? 1 : a.data > b.data ? -1 : 0).slice(0, 5);

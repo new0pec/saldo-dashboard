@@ -459,6 +459,42 @@ span.mf-num{color:var(--muted);font-weight:500}
 .pg-l small{font-size:12px;color:var(--muted)}
 .pg-v{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
 .pg-vazio{padding:10px;color:var(--muted);font-size:14px}
+.fora-dados{display:none!important}
+.fxs{display:flex;flex-direction:column}
+.fx{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.fx:last-child{border-bottom:0}
+.fx .rq-t{flex:1}
+.fx.atraso small{color:#FF9F0A}
+.fx-v{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fx-x{border:0;background:transparent;color:var(--muted);font-size:20px;width:28px;height:28px;border-radius:50%;cursor:pointer}
+.fx-tot{font-size:13px;color:var(--muted);margin:8px 0 0}
+.pv-l{display:flex;justify-content:space-between;gap:8px;font-size:15px;padding:5px 0}
+.pv-l b{font-variant-numeric:tabular-nums}
+.pv-bom{color:#30D158}.pv-mau{color:#FF453A}
+#previsao .sc-orc{margin:2px 0 6px}
+.semtag{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.semtag .hs-b{background:#FF9F0A;color:#fff}
+.hs-b.leve2{background:color-mix(in srgb,var(--fg) 10%,transparent);color:var(--fg)}
+.ar-mv{display:flex;align-items:center;gap:10px;padding:12px;border-radius:16px;background:color-mix(in srgb,var(--fg) 7%,transparent);margin:6px 0 4px}
+.ar-mv .rq-t{flex:1}
+.ar-acoes{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.ar-fim{font-size:16px;font-weight:600;color:#30D158;padding:14px 2px}
+.meta-de{font-size:14px;font-weight:600;color:var(--muted)}
+.meta-add{align-self:flex-start;background:#30D158;color:#fff}
+.semana-card{display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer;color:inherit;font:inherit}
+.semana-card .rq-t{flex:1}
+.sem-ico{width:38px;height:38px;flex:0 0 38px;border-radius:50%;background:#FF9F0A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px}
+.sem-novo{font-size:11px;background:#FF453A;color:#fff;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:2px}
+.story{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px)}
+.st-box{position:relative;width:min(420px,100%);height:min(640px,100%);border-radius:28px;padding:22px;background:linear-gradient(160deg,#FF9F0A,#FF375F);color:#fff;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;user-select:none}
+.st-dots{display:flex;gap:5px;padding-right:40px}
+.st-dots i{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.35)}
+.st-dots i.on{background:#fff}
+.st-x{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:50%;border:0;background:rgba(0,0,0,.2);color:#fff;font-size:22px;cursor:pointer}
+.st-a{font-size:17px;font-weight:600;margin:0;opacity:.95}
+.st-b{font-size:34px;font-weight:800;line-height:1.15;margin:0 0 10px;letter-spacing:-.5px}
+.st-c{font-size:17px;margin:0;opacity:.95}
+.st-dica{font-size:13px;opacity:.8;margin:0}
 .sc-tags{display:flex;flex-wrap:wrap;gap:4px}
 .sc-tag{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,#FF9F0A 22%,transparent)}
 .sc-sub{font-size:12px;color:var(--muted)}
@@ -546,6 +582,17 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
       <div class="ring" id="ring"></div>
     </section>
 
+    <button type="button" class="card semana-card" id="semana-card" data-tab="inicio" aria-label="Abrir o resumo da semana">
+      <span class="sem-ico" aria-hidden="true">▶</span>
+      <span class="rq-t"><b>Resumo da semana <span class="sem-novo" id="semana-novo" hidden>Novo</span></b><small id="semana-sub"></small></span>
+      <span class="mf-chev" aria-hidden="true">›</span>
+    </button>
+
+    <section class="card" id="previsao" data-tab="inicio">
+      <div class="card-head"><h2>Previsão do fim do mês</h2></div>
+      <div id="pv-corpo"></div>
+    </section>
+
     <section class="card" id="rapido-card" data-tab="inicio">
       <div class="card-head"><h2>Adicionar rápido</h2></div>
       <p class="hint" style="margin:-4px 0 10px">Os comerciantes que mais usa. Toque e escreva o valor.</p>
@@ -555,6 +602,13 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
     <button type="button" class="card ini-total" id="ini-total" data-tab="inicio" aria-label="Ver o total disponível">
       <span><span class="label">Total disponível</span><span class="ini-v" id="ini-total-v">—</span></span><span class="tv-ver">Ver <span aria-hidden="true">›</span></span>
     </button>
+
+    <section class="card" id="fixos-card" data-tab="inicio">
+      <div class="card-head"><h2>Próximos pagamentos</h2></div>
+      <p class="hint" style="margin:-4px 0 8px">O que se repete todos os meses. Toque em × se algum não for fixo.</p>
+      <div class="fxs" id="fixos"></div>
+      <p class="fx-tot" id="fixos-tot"></p>
+    </section>
 
     <section class="card" id="mensal" data-tab="inicio">
       <div class="card-head"><h2>Receitas e despesas por mês</h2><p class="hint">Toque num mês para o abrir</p></div>
@@ -602,6 +656,16 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
       </button>
       <p class="hint">Toca numa conta para ver os movimentos só dessa conta. Toca no lápis para pores o saldo real que vês na app do banco.</p>
       <div class="tiles" id="tiles"></div>
+    </section>
+
+    <section class="card" id="metas-card" data-tab="contas">
+      <div class="card-head"><h2>Metas de poupança</h2><button type="button" class="link" id="nova-meta">+ Nova meta</button></div>
+      <div class="scards" id="metas"></div>
+    </section>
+
+    <section class="card semtag" id="semtag-card" data-tab="movimentos">
+      <span class="rq-t"><b>Arrumar hashtags</b><small id="semtag-n"></small></span>
+      <button type="button" class="hs-b" id="semtag-btn">Arrumar</button>
     </section>
 
     <section class="card" id="listas" data-tab="movimentos">
@@ -797,6 +861,45 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
   </div>
 </div>
 
+<div class="sheet-wrap" id="sh-arrumar" hidden>
+  <div class="sheet glass mf" role="dialog" aria-modal="true" aria-labelledby="ar-title">
+    <div class="mf-top"><span class="hint" id="ar-prog"></span><b id="ar-title">Arrumar hashtags</b><button type="button" class="mf-save" id="ar-fechar">Concluir</button></div>
+    <p class="hint">Toque numa hashtag e passa ao seguinte. As hashtags ficam guardadas na app Saldo (o ficheiro do MoneyStats não muda).</p>
+    <div id="ar-corpo"></div>
+    <input class="search chip-search" id="ar-q" type="search" placeholder="Procurar ou criar hashtag" aria-label="Procurar ou criar hashtag" autocomplete="off" style="margin-top:10px">
+    <div class="ar-acoes"><button type="button" class="hs-b leve2" id="ar-saltar">Saltar</button><button type="button" class="hs-b leve2" id="ar-nao">Não precisa de hashtag</button></div>
+  </div>
+</div>
+
+<div class="sheet-wrap" id="sh-meta" hidden>
+  <div class="sheet glass mf" role="dialog" aria-modal="true" aria-labelledby="me-title">
+    <div class="mf-top"><button type="button" class="link" data-close>Cancelar</button><b id="me-title">Nova meta</b><button type="button" class="mf-save" id="me-ok">Guardar</button></div>
+    <div class="mf-card">
+      <label class="mf-row"><span class="mf-lab">Nome</span><input class="mf-in mf-num" id="me-nome" autocomplete="off" placeholder="Férias de verão"></label>
+      <label class="mf-row"><span class="mf-lab">Quero juntar</span><input class="mf-in mf-num" id="me-alvo" inputmode="decimal" autocomplete="off" placeholder="1 500"><span class="mf-eur">€</span></label>
+      <label class="mf-row"><span class="mf-lab">Até</span><input class="mf-in mf-num" id="me-ate" type="month"></label>
+    </div>
+    <h3 class="sh-sub">Como acompanhar</h3>
+    <div class="mf-card">
+      <label class="mf-row"><span class="mf-lab">Conta</span><select class="mf-in mf-num" id="me-conta"></select></label>
+      <label class="mf-row" id="me-guard-row"><span class="mf-lab">Já tenho</span><input class="mf-in mf-num" id="me-guard" inputmode="decimal" autocomplete="off" placeholder="0,00"><span class="mf-eur">€</span></label>
+    </div>
+    <p class="hint">Escolha uma conta (por exemplo Trade Republic) para a meta seguir o saldo dela. Sem conta, vai pondo o valor à mão com «+ Pôr de lado».</p>
+    <p class="msg" id="me-msg" role="alert"></p>
+    <button type="button" class="mf-del" id="me-del" hidden>Apagar meta</button>
+  </div>
+</div>
+
+<div class="story" id="story" hidden role="dialog" aria-modal="true" aria-label="Resumo da semana">
+  <div class="st-box">
+    <div class="st-dots" id="st-dots"></div>
+    <button type="button" class="st-x" id="st-x" aria-label="Fechar">×</button>
+    <p class="st-a" id="st-a"></p>
+    <div><p class="st-b" id="st-b"></p><p class="st-c" id="st-c"></p></div>
+    <p class="st-dica" id="st-dica"></p>
+  </div>
+</div>
+
 <div class="sheet-wrap" id="sh-pick" hidden>
   <div class="sheet glass mf" role="dialog" aria-modal="true" aria-labelledby="p-title">
     <div class="mf-top"><button type="button" class="link" id="p-back">Voltar</button><b id="p-title"></b><button type="button" class="mf-save" id="p-ok" hidden>OK</button></div>
@@ -860,6 +963,6 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 
 <input type="file" id="file" accept=".txt,.csv,text/plain,text/csv" hidden>
 
-<script src="app.js?v=202611250229"></script>
+<script src="app.js?v=202611250235"></script>
 </body>
 </html>
