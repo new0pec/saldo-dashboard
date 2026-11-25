@@ -2,6 +2,8 @@
 <html lang="pt-PT">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.dropboxusercontent.com; connect-src 'self' https://api.dropboxapi.com https://content.dropboxapi.com; font-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#FF9F0A">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -12,13 +14,14 @@
 <link rel="icon" href="icons/icon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="vendor/d3-7.9.2.min.js"></script>
 <style>
 :root{--fg:#1c1c1e;--muted:#6e6e73;--panel:#ffffff;--line:rgba(0,0,0,.1);--page:#fbf3ee;color-scheme:light dark}
 @media (prefers-color-scheme:dark){:root{--fg:#f5f5f7;--muted:#a1a1a6;--panel:#1c1c1e;--line:rgba(255,255,255,.12);--page:#140c10}}
 *{box-sizing:border-box}
 html{background:var(--page)}
 body{margin:0;background:transparent;min-height:100vh}
+button,a,input,select,[role=button]{touch-action:manipulation}
 body.bloqueado{position:fixed;left:0;right:0;overflow:hidden}
 body{color:var(--fg);font-family:-apple-system,"SF Pro Text","SF Pro Display",system-ui,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit}
@@ -30,7 +33,8 @@ button,input,select{font:inherit;color:inherit}
 .ios-bg .o3{width:460px;height:460px;left:5%;bottom:-140px;background:radial-gradient(circle,#FF2D55,transparent 65%);opacity:.4}
 .ios-bg .o4{width:400px;height:400px;right:-60px;bottom:10%;background:radial-gradient(circle,#D63384,transparent 65%);opacity:.36}
 @media (prefers-reduced-motion:no-preference){.ios-bg .orb{animation:drift 22s ease-in-out infinite alternate}.ios-bg .o2{animation-duration:27s}.ios-bg .o3{animation-duration:31s}@keyframes drift{to{transform:translate(40px,30px) scale(1.08)}}}
-.glass,.card,.chip,.tile{background:color-mix(in srgb,var(--panel) 58%,transparent);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 8px 28px rgba(0,0,0,.07)}
+.glass,.card,.chip,.tile{background:color-mix(in srgb,var(--panel) 70%,transparent);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 8px 28px rgba(0,0,0,.07)}
+.glass{background:color-mix(in srgb,var(--panel) 58%,transparent);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%)}
 .head{padding:18px 4px 10px}
 .head-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .head-actions{display:flex;align-items:center;gap:8px}
@@ -147,7 +151,7 @@ button,input,select{font:inherit;color:inherit}
 .onboard h2{margin:0 0 8px;font-size:22px}
 .onboard p{color:var(--muted);line-height:1.5;margin:0 auto 16px;max-width:460px}
 .onboard .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-.fab{position:fixed;right:calc(18px + env(safe-area-inset-right));bottom:calc(98px + env(safe-area-inset-bottom));z-index:10;width:58px;height:58px;border-radius:50%;border:0;background:#FF9F0A;color:#fff;font-size:32px;line-height:1;font-weight:400;cursor:pointer;box-shadow:0 10px 28px rgba(255,159,10,.45);transition:transform .15s}
+.fab{position:fixed;right:calc(18px + env(safe-area-inset-right));bottom:calc(104px + env(safe-area-inset-bottom));z-index:14;width:58px;height:58px;border-radius:50%;border:0;background:#FF9F0A;color:#fff;font-size:32px;line-height:1;font-weight:400;cursor:pointer;box-shadow:0 10px 28px rgba(255,159,10,.45);transition:transform .15s}
 .fab:active{transform:scale(.92)}
 .sheet-top{display:flex;justify-content:space-between;align-items:center;margin:-4px 0 14px;gap:8px}
 .sheet-top b{font-size:16px}
@@ -187,7 +191,7 @@ button,input,select{font:inherit;color:inherit}
 .g-row.mudou{box-shadow:inset 0 0 0 1.5px #FF9F0A}
 .g-cat{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .g-sel{border:1px solid var(--line);border-radius:9px;padding:5px 8px;font-size:13px;background:var(--panel);max-width:55%}
-.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;max-width:calc(100% - 32px);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#fff;background:rgba(30,30,32,.92);box-shadow:0 8px 24px rgba(0,0,0,.25);text-align:center}
+.toast{position:fixed;left:50%;bottom:calc(172px + env(safe-area-inset-bottom));pointer-events:none;transform:translateX(-50%);z-index:30;max-width:calc(100% - 32px);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#fff;background:rgba(30,30,32,.92);box-shadow:0 8px 24px rgba(0,0,0,.25);text-align:center}
 .toast.erro{background:rgba(180,40,40,.95);border-radius:16px}
 .card-head .link{font-size:14px}
 .mf{max-width:480px;padding:16px 14px 22px;background:color-mix(in srgb,var(--panel) 92%,transparent)}
@@ -399,7 +403,7 @@ span.mf-num{color:var(--muted);font-weight:500}
 .hrow.on .hfill{background:#FF9F0A}
 .hp{font-size:12px;color:var(--muted)}
 .hmais{align-self:flex-start;margin:6px 0 0 40px}
-.hsoma{position:sticky;bottom:10px;margin-top:10px;border-radius:18px;padding:12px 14px;background:color-mix(in srgb,var(--panel) 70%,transparent);border:1px solid var(--line);font-size:13px;color:var(--muted)}
+.hsoma{position:sticky;bottom:calc(96px + env(safe-area-inset-bottom));z-index:2;margin-top:10px;border-radius:18px;padding:12px 14px;background:color-mix(in srgb,var(--panel) 70%,transparent);border:1px solid var(--line);font-size:13px;color:var(--muted)}
 .hsoma.on{background:#FF9F0A;border-color:transparent;color:#fff;display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:flex-end}
 .hs-v{font-size:28px;font-weight:800;letter-spacing:-.5px;line-height:1.15}
 .hs-n,.hs-t,.hs-pct{font-size:12.5px;opacity:.92}
@@ -467,6 +471,8 @@ span.mf-num{color:var(--muted);font-weight:500}
 .fx.atraso small{color:#FF9F0A}
 .fx-v{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
 .fx-x{border:0;background:transparent;color:var(--muted);font-size:20px;width:28px;height:28px;border-radius:50%;cursor:pointer}
+.fx .rq-t small{white-space:normal}
+body:not(.tab-inicio) #lede{display:none}
 .fx-tot{font-size:13px;color:var(--muted);margin:8px 0 0}
 .pv-l{display:flex;justify-content:space-between;gap:8px;font-size:15px;padding:5px 0}
 .pv-l b{font-variant-numeric:tabular-nums}
@@ -499,8 +505,9 @@ span.mf-num{color:var(--muted);font-weight:500}
 .sc-tag{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,#FF9F0A 22%,transparent)}
 .sc-sub{font-size:12px;color:var(--muted)}
 .fora{display:none!important}
-.tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));z-index:9;width:min(560px,calc(100% - 20px));display:flex;gap:2px;padding:6px;border-radius:999px;border:1px solid var(--line)}
-.tabbar button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;border:1.5px solid transparent;background:transparent;color:var(--muted);border-radius:999px;padding:6px 2px;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer}
+.tabbar{position:fixed;left:10px;right:10px;margin:0 auto;max-width:560px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:15;touch-action:manipulation;-webkit-user-select:none;user-select:none;display:flex;gap:2px;padding:6px;border-radius:999px;border:1px solid var(--line)}
+.tabbar button{flex:1;min-width:0;min-height:54px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;border:1.5px solid transparent;background:transparent;color:var(--muted);border-radius:999px;padding:6px 2px;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer}
+.tabbar svg,.tabbar span{pointer-events:none}
 .tabbar svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .tabbar button[aria-selected="true"]{color:#FF9F0A;border-color:#FF9F0A;background:color-mix(in srgb,var(--panel) 70%,transparent)}
 .tabbar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -529,7 +536,7 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 .tg-del{border:0;background:color-mix(in srgb,var(--fg) 9%,transparent);width:28px;height:28px;border-radius:50%;font-size:18px;line-height:1;cursor:pointer;color:var(--muted);flex:0 0 auto}
 #sh-tags,#sh-lista{z-index:50}
 [hidden]{display:none!important}
-@media (max-width:520px){.title{font-size:34px}.hero-num{font-size:38px}.ring{width:124px;height:124px}}
+@media (max-width:520px){.title{font-size:34px}.hero-num{font-size:38px}.ring{width:132px;height:132px}.ring-c strong{font-size:25px}.ring-c span{max-width:72px}}
 @media (prefers-reduced-motion:no-preference){.card,.tile{animation:in .5s cubic-bezier(.2,.8,.2,1) both}@keyframes in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}}
 </style>
 </head>
@@ -554,8 +561,8 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
   </header>
 
   <section class="card onboard" id="onboard" hidden>
-    <h2>Liga o teu Dropbox</h2>
-    <p>O Saldo lê a exportação mais recente do MoneyStats numa pasta do teu Dropbox. Os dados ficam só neste dispositivo.</p>
+    <h2>Ligue o seu Dropbox</h2>
+    <p>O Saldo lê a exportação mais recente do MoneyStats numa pasta do seu Dropbox. Os dados ficam só neste dispositivo.</p>
     <div class="row">
       <button type="button" class="btn" id="onboard-settings">Configurar Dropbox</button>
       <button type="button" class="btn sec" id="onboard-file">Abrir ficheiro</button>
@@ -588,6 +595,10 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
       <span class="mf-chev" aria-hidden="true">›</span>
     </button>
 
+    <button type="button" class="card ini-total" id="ini-total" data-tab="inicio" aria-label="Ver o total disponível">
+      <span><span class="label">Total disponível</span><span class="ini-v" id="ini-total-v">—</span></span><span class="tv-ver">Ver <span aria-hidden="true">›</span></span>
+    </button>
+
     <section class="card" id="previsao" data-tab="inicio">
       <div class="card-head"><h2>Previsão do fim do mês</h2></div>
       <div id="pv-corpo"></div>
@@ -599,9 +610,6 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
       <div class="rapido" id="rapido"></div>
     </section>
 
-    <button type="button" class="card ini-total" id="ini-total" data-tab="inicio" aria-label="Ver o total disponível">
-      <span><span class="label">Total disponível</span><span class="ini-v" id="ini-total-v">—</span></span><span class="tv-ver">Ver <span aria-hidden="true">›</span></span>
-    </button>
 
     <section class="card" id="fixos-card" data-tab="inicio">
       <div class="card-head"><h2>Próximos pagamentos</h2></div>
@@ -654,7 +662,7 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
         <p class="hint" id="total-nota"></p>
         <span class="tv-ver">Ver detalhe <span aria-hidden="true">›</span></span>
       </button>
-      <p class="hint">Toca numa conta para ver os movimentos só dessa conta. Toca no lápis para pores o saldo real que vês na app do banco.</p>
+      <p class="hint">Toque numa conta para ver os movimentos só dessa conta. Toque no lápis para pôr o saldo real que vê na app do banco.</p>
       <div class="tiles" id="tiles"></div>
     </section>
 
@@ -676,7 +684,7 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 
     <section class="card" id="movimentos" data-tab="movimentos">
       <div class="card-head"><h2>Movimentos</h2><span id="filtroCat"></span></div>
-      <input class="search" id="search" type="search" placeholder="Procurar categoria, etiqueta ou conta" aria-label="Procurar movimentos">
+      <input class="search" id="search" type="search" placeholder="Procurar comerciante, hashtag ou conta" aria-label="Procurar movimentos">
       <ul class="txlist" id="lista"></ul>
     </section>
 
@@ -704,7 +712,7 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 <div class="sheet-wrap" id="sheet" hidden>
   <div class="sheet glass" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
     <h2 id="sheet-title">Definições</h2>
-    <p>Para ler o Dropbox, cria uma app tua (gratuita) e cola aqui a <b>App key</b>. Vê os passos no README do projeto.</p>
+    <p>Para ler o Dropbox, crie uma app sua (gratuita) e cole aqui a <b>App key</b>. Veja os passos no README do projeto.</p>
     <label for="cfg-key">App key do Dropbox</label>
     <input type="text" id="cfg-key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="abc123xyz456">
     <label for="cfg-folder">Pasta</label>
@@ -795,7 +803,7 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 <div class="sheet-wrap" id="sh-capas" hidden>
   <div class="sheet glass mf" role="dialog" aria-modal="true" aria-label="Capas das categorias">
     <div class="mf-top"><button type="button" class="link" data-close>Fechar</button><b>Capas</b><span></span></div>
-    <p class="hint">Escolhe uma foto da pasta <b>Photos</b> no Dropbox para cada conta e para cada comerciante.</p>
+    <p class="hint">Escolha uma foto da pasta <b>Photos</b> no Dropbox para cada conta e para cada comerciante.</p>
     <h3 class="sh-sub">Contas</h3>
     <div class="mf-card plist" id="cp-contas"></div>
     <h3 class="sh-sub">Comerciantes</h3>
@@ -813,14 +821,14 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 <div class="sheet-wrap" id="sh-tags" hidden>
   <div class="sheet glass mf" role="dialog" aria-modal="true" aria-label="Regras de hashtags">
     <div class="mf-top"><button type="button" class="link" data-close>Fechar</button><b>Regras de hashtags</b><span></span></div>
-    <p class="hint">Escolhe um comerciante e a hashtag que os movimentos dele devem ter. Por exemplo, Continente com #Alimentação, ou Farmácia com #Medicamentos. Vale para todos os movimentos, antigos e novos.</p>
+    <p class="hint">Escolha um comerciante e a hashtag que os movimentos dele devem ter. Por exemplo, Continente com #Alimentação, ou Farmácia com #Medicamentos. Vale para todos os movimentos, antigos e novos.</p>
     <div class="mf-card">
       <label class="mf-row"><span class="mf-lab">Comerciante</span><select class="mf-in" id="tg-cat" style="text-align:right"></select></label>
       <label class="mf-row"><span class="mf-lab">Hashtag</span><input class="mf-in" id="tg-tag" list="dl-tags" autocomplete="off" placeholder="#Alimentação" style="text-align:right;font-weight:600"></label>
     </div>
     <p class="msg" id="tg-msg" role="alert"></p>
     <button type="button" class="btn big" id="tg-add">Adicionar regra</button>
-    <h3 class="sh-sub">As tuas regras</h3>
+    <h3 class="sh-sub">As suas regras</h3>
     <div class="mf-card plist" id="tg-list"></div>
   </div>
 </div>
@@ -912,12 +920,11 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 <div class="sheet-wrap" id="sh-grupos" hidden>
   <div class="sheet glass" role="dialog" aria-modal="true" aria-label="Editar grupos">
     <div class="sheet-top"><button type="button" class="link" data-close>Cancelar</button><b>Grupos</b><button type="button" class="link" id="g-ok">Guardar</button></div>
-    <p>Escolhe o grupo de cada categoria. As alterações valem também para os movimentos do MoneyStats.</p>
+    <p>Escolha o grupo de cada categoria. As alterações valem também para os movimentos do MoneyStats.</p>
     <div id="g-list"></div>
     <button type="button" class="btn sec big" id="g-reset">Repor grupos originais</button>
   </div>
 </div>
-<datalist id="dl-cats"></datalist>
 <div class="toast" id="toast" role="status" hidden></div>
 <div class="tv" id="tv" hidden role="dialog" aria-modal="true" aria-label="Total disponível">
   <div class="tv-app">
@@ -941,7 +948,7 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
       </section>
       <section id="tv-contas" aria-labelledby="tv-contas-title">
         <div class="tv-h2row"><h2 class="tv-h2" id="tv-contas-title">Contas</h2><button type="button" class="tv-link" id="tv-nova-conta">+ Nova conta</button></div>
-        <p class="tv-hint">Olho para mostrar ou esconder o saldo · lápis para pores o saldo real que vês na app do banco.</p>
+        <p class="tv-hint">Olho para mostrar ou esconder o saldo · lápis para pôr o saldo real que vê na app do banco.</p>
         <ul class="tv-list" id="tv-cards"></ul>
       </section>
       <section id="tv-dist" aria-labelledby="tv-dist-title">
@@ -963,6 +970,6 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 
 <input type="file" id="file" accept=".txt,.csv,text/plain,text/csv" hidden>
 
-<script src="app.js?v=202611250235"></script>
+<script src="app.js?v=202611250245"></script>
 </body>
 </html>

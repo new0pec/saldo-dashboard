@@ -101,9 +101,10 @@
     if (!key) throw new Error('Falta a App key do Dropbox.');
     const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
     const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
-    sessionStorage.setItem(CFG.ver, verifier);
+    const estado = b64url(crypto.getRandomValues(new Uint8Array(16)));
+    sessionStorage.setItem(CFG.ver, verifier); sessionStorage.setItem(CFG.ver + '.state', estado);
     const u = new URL('https://www.dropbox.com/oauth2/authorize');
-    u.search = new URLSearchParams({ client_id: key, response_type: 'code', code_challenge: challenge, code_challenge_method: 'S256', redirect_uri: redirectUri(), token_access_type: 'offline' });
+    u.search = new URLSearchParams({ client_id: key, response_type: 'code', code_challenge: challenge, code_challenge_method: 'S256', redirect_uri: redirectUri(), token_access_type: 'offline', state: estado });
     location.assign(u.toString());
   }
 
@@ -119,33 +120,36 @@
     if (!p.has('code') && !p.has('error')) return;
     history.replaceState(null, '', redirectUri());
     if (p.has('error')) throw new Error('Ligação ao Dropbox cancelada.');
-    const verifier = sessionStorage.getItem(CFG.ver);
-    sessionStorage.removeItem(CFG.ver);
-    if (!verifier) throw new Error('A ligação expirou. Tenta outra vez.');
+    const verifier = sessionStorage.getItem(CFG.ver), estado = sessionStorage.getItem(CFG.ver + '.state');
+    sessionStorage.removeItem(CFG.ver); sessionStorage.removeItem(CFG.ver + '.state');
+    if (!verifier) throw new Error('A ligação expirou. Tente outra vez.');
+    if (!estado || p.get('state') !== estado) throw new Error('A resposta do Dropbox não corresponde a este pedido. Tente ligar outra vez.');
     const j = await tokenRequest({ code: p.get('code'), grant_type: 'authorization_code', code_verifier: verifier, client_id: appKey(), redirect_uri: redirectUri() });
     store.set(CFG.tok, JSON.stringify({ access: j.access_token, refresh: j.refresh_token, exp: Date.now() + (j.expires_in - 60) * 1000 }));
   }
 
+  let renovando = null;
   async function accessToken() {
-    const t = JSON.parse(store.get(CFG.tok) || 'null');
+    let t; try { t = JSON.parse(store.get(CFG.tok) || 'null'); } catch (e) { t = null; }
     if (!t) return null;
     if (t.access && t.exp > Date.now()) return t.access;
     if (!t.refresh) return null;
-    const j = await tokenRequest({ grant_type: 'refresh_token', refresh_token: t.refresh, client_id: appKey() });
-    t.access = j.access_token; t.exp = Date.now() + (j.expires_in - 60) * 1000;
-    store.set(CFG.tok, JSON.stringify(t));
-    return t.access;
+    // vários pedidos ao mesmo tempo partilham a mesma renovação do token
+    if (!renovando) renovando = tokenRequest({ grant_type: 'refresh_token', refresh_token: t.refresh, client_id: appKey() })
+      .then(j => { t.access = j.access_token; t.exp = Date.now() + (j.expires_in - 60) * 1000; store.set(CFG.tok, JSON.stringify(t)); return t.access; })
+      .finally(() => { renovando = null; });
+    return renovando;
   }
 
   async function dbx(url, opts) {
     const tok = await accessToken();
-    if (!tok) throw new Error('Liga o Dropbox nas definições.');
+    if (!tok) throw new Error('Ligue o Dropbox em Ajustes.');
     const r = await fetch(url, { method: 'POST', ...opts, headers: { Authorization: 'Bearer ' + tok, ...(opts && opts.headers) } });
     if (r.status === 401) {
       let j = {}; try { j = JSON.parse(await r.text()); } catch (e) {}
       const sum = j.error_summary || '';
-      if (/missing_scope|insufficient_scope/.test(sum)) { const err = new Error('Falta a permissão files.content.write na app do Dropbox. Ativa-a e liga de novo.'); err.summary = sum; throw err; }
-      store.del(CFG.tok); throw new Error('A sessão do Dropbox expirou. Liga outra vez.');
+      if (/missing_scope|insufficient_scope/.test(sum)) { const err = new Error('Falta a permissão files.content.write na app do Dropbox. Ative-a e ligue de novo.'); err.summary = sum; throw err; }
+      store.del(CFG.tok); throw new Error('A sessão do Dropbox expirou. Ligue outra vez.');
     }
     if (!r.ok) {
       const t = await r.text(); let j = {}; try { j = JSON.parse(t); } catch (e) {}
@@ -163,7 +167,7 @@
     return dbx('https://api.dropboxapi.com/2/files/list_folder', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, recursive: false }) });
   }
 
-  async function latestFromDropbox() {
+  async function latestFromDropbox(seIgual) {
     let r;
     try { r = await listFolder(folder()); }
     catch (e) {
@@ -177,17 +181,23 @@
       r = await dbx('https://api.dropboxapi.com/2/files/list_folder/continue', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cursor: j.cursor }) });
       j = await r.json(); entries = entries.concat(j.entries);
     }
+    // o mais recente: a data mais tarde entre a do ficheiro e a da chegada ao Dropbox
+    const quando = e => [e.client_modified || '', e.server_modified || ''].sort().pop();
     const files = entries.filter(e => e['.tag'] === 'file' && /\.(txt|csv)$/i.test(e.name))
-      .sort((a, b) => String(b.client_modified || b.server_modified).localeCompare(String(a.client_modified || a.server_modified)));
+      .sort((a, b) => quando(b).localeCompare(quando(a)));
     if (!files.length) throw new Error('Não encontrei ficheiros .txt ou .csv em ' + folder() + '.');
     const f = files[0];
+    if (seIgual && seIgual.rev && seIgual.rev === f.rev) return { igual: true };
     const d = await dbx('https://content.dropboxapi.com/2/files/download', { headers: { 'Dropbox-API-Arg': JSON.stringify({ path: f.id }) } });
-    return { text: await d.text(), name: f.name, modified: f.client_modified || f.server_modified, origem: 'Dropbox' };
+    return { text: await d.text(), name: f.name, modified: f.client_modified || f.server_modified, rev: f.rev, origem: 'Dropbox' };
   }
 
   // ---------- Estado e cálculos ----------
   const S = { rows: [], meta: null, ano: '', mes: '', conta: '', grupo: '', categoria: '', q: '', tag: '', lista: '', multi: [] };
   let drawnBars = false;
+  // cálculos repetidos guardados até à próxima mudança de dados ou de filtros
+  let MEMO = {};
+  const memo = (k, f) => (k in MEMO ? MEMO[k] : (MEMO[k] = f()));
 
   // ---------- Movimentos manuais e grupos personalizados (manuais.json no Dropbox) ----------
   const MAN_KEY = 'saldo.manuais';
@@ -230,6 +240,7 @@
     return out.length ? out : [m.data];
   }
   function compose() {
+    MEMO = {};
     const base = (S.base || []).map(r => r.tipo === 'Transferência' || !M.grupos[r.categoria] ? r : { ...r, grupo: M.grupos[r.categoria] });
     const man = M.movimentos.filter(m => m && /^\d{4}-\d{2}-\d{2}$/.test(m.data)).flatMap(m => ocorrencias(m).map((data, k) => ({
       id: m.id, data, mes: data.slice(0, 7), montante: +m.montante, conta: m.conta, categoria: m.categoria, etiquetas: m.etiquetas || '',
@@ -245,8 +256,12 @@
     });
     if (S.lista && !listaAtiva()) S.lista = '';
   }
+  const PEND_KEY = 'saldo.manuais.pendente';
+  let gravacao = Promise.resolve();
   async function loadManuais() {
     if (!ligado()) return false;
+    // há alterações locais por enviar: envia-as primeiro em vez de as substituir pelas do Dropbox
+    if (store.get(PEND_KEY)) { await enviaManuais(); if (store.get(PEND_KEY)) return false; }
     try {
       const r = await dbx('https://content.dropboxapi.com/2/files/download', { headers: { 'Dropbox-API-Arg': argHeader({ path: manFile() }) } });
       const novo = migraNomes(normaliza(JSON.parse(await r.text())));
@@ -255,14 +270,23 @@
       return mudou;
     } catch (e) { if (/not_found/.test(e.summary || '')) return false; throw e; }
   }
+  function enviaManuais(okMsg) {
+    // uploads em fila: o último a chegar ao Dropbox é sempre o mais recente
+    gravacao = gravacao.then(async () => {
+      if (!ligado()) return;
+      try {
+        await dbx('https://content.dropboxapi.com/2/files/upload', { headers: { 'Dropbox-API-Arg': argHeader({ path: manFile(), mode: 'overwrite', mute: true }), 'Content-Type': 'application/octet-stream' }, body: JSON.stringify(M, null, 1) });
+        store.del(PEND_KEY);
+        if (okMsg) toast(okMsg);
+      } catch (e) { if (okMsg) toast(/scope/.test(e.summary || '') ? e.message : 'Ficou guardado neste dispositivo e será enviado para o Dropbox mais tarde (' + e.message + ').', true); }
+    });
+    return gravacao;
+  }
   async function saveManuais(okMsg) {
-    store.set(MAN_KEY, JSON.stringify(M));
+    store.set(MAN_KEY, JSON.stringify(M)); store.set(PEND_KEY, '1');
     compose(); render();
-    if (!ligado()) { toast('Guardado só neste dispositivo. Liga o Dropbox para sincronizar.'); return; }
-    try {
-      await dbx('https://content.dropboxapi.com/2/files/upload', { headers: { 'Dropbox-API-Arg': argHeader({ path: manFile(), mode: 'overwrite', mute: true }), 'Content-Type': 'application/octet-stream' }, body: JSON.stringify(M, null, 1) });
-      toast(okMsg || 'Guardado no Dropbox');
-    } catch (e) { toast(/scope/.test(e.summary || '') ? e.message : 'Ficou guardado neste dispositivo, mas não no Dropbox: ' + e.message, true); }
+    if (!ligado()) { toast('Guardado só neste dispositivo. Ligue o Dropbox para sincronizar.'); return; }
+    return enviaManuais(okMsg || 'Guardado no Dropbox');
   }
 
   function meses() {
@@ -321,6 +345,7 @@
 
   // ---------- Desenho ----------
   function render() {
+    MEMO = {};
     const has = S.rows.length > 0;
     $('app').hidden = !has; $('onboard').hidden = has;
     $('lede').hidden = !has; $('ano').hidden = !has; $('fab').hidden = !has; document.body.classList.toggle('sem-dados', !has);
@@ -437,16 +462,13 @@
     drawnBars = true;
   }
 
-  const setGrupo = g => set({ grupo: S.grupo === g ? '' : g, categoria: '' });
 
   // Gastos por hashtag (as hashtags que vêm do ficheiro do MoneyStats)
-  const TAG_CORES = ['#FF9F0A', '#0A84FF', '#FF453A', '#FFD60A', '#5E5CE6', '#64D2FF', '#FF375F', '#30D158', '#BF5AF2', '#AC8E68', '#66D4CF', '#FF6B35', '#8E8E93', '#32ADE6', '#D63384', '#A2845E'];
-  const tagCor = t => { if (t === 'Sem hashtag') return '#8E8E93'; let h = 0; for (const c of t) h = (h * 31 + c.charCodeAt(0)) >>> 0; return TAG_CORES[h % TAG_CORES.length]; };
   // Gastos por hashtag (opção B): ranking com seleção e barra de soma
   let SOMA = (() => { try { return JSON.parse(store.get('saldo.soma') || '[]'); } catch (e) { return []; } })();
   let verTodas = false;
   const guardaSel = () => store.set('saldo.soma', JSON.stringify(SOMA));
-  const rowsPeriodo = () => S.rows.filter(r => r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta) && (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano));
+  const rowsPeriodo = () => memo('periodo', () => S.rows.filter(r => r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta) && (!S.mes || r.mes === S.mes) && (!S.ano || r.mes.slice(0, 4) === S.ano)));
   // soma das despesas com qualquer uma das hashtags (cada movimento conta uma vez)
   function somaTags(tags, rows) {
     const sel = rows.filter(r => r.tipo === 'Despesa' && (r.ftags || []).some(t => tags.includes(t)));
@@ -536,19 +558,21 @@
     }));
   }
   const prevMes = k => { let [y, m] = k.split('-').map(Number); m--; if (!m) { m = 12; y--; } return y + '-' + String(m).padStart(2, '0'); };
-  function mesRef() {
+  function mesRef() { return memo('mesRef', mesRefCalc); }
+  function mesRefCalc() {
     if (S.mes) return S.mes;
     const ms = [...new Set(S.rows.filter(r => !S.ano || r.mes.slice(0, 4) === S.ano).map(r => r.mes))].sort();
     return ms[ms.length - 1] || '';
   }
-  function nMesesPeriodo() {
+  function nMesesPeriodo() { return memo('nMeses', nMesesCalc); }
+  function nMesesCalc() {
     if (S.mes) return 1;
     return Math.max(1, new Set(S.rows.filter(r => !S.ano || r.mes.slice(0, 4) === S.ano).map(r => r.mes)).size);
   }
   function comparaMes(tags, ehRec) {
     const k = mesRef(); if (!k) return null;
-    const ant = prevMes(k), base = S.rows.filter(r => r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta));
-    const val = mes => { const x = somaTags(tags, base.filter(r => r.mes === mes)); return ehRec ? x.rec : x.total; };
+    const ant = prevMes(k), pm = memo('porMes', () => d3.group(S.rows.filter(r => r.tipo !== 'Transferência' && (!S.conta || r.conta === S.conta)), r => r.mes));
+    const val = mes => { const x = somaTags(tags, pm.get(mes) || []); return ehRec ? x.rec : x.total; };
     const a = val(k), b = val(ant); if (!a && !b) return null;
     const d = a - b, nomeAnt = MES[+ant.slice(5, 7) - 1], nomeK = MES[+k.slice(5, 7) - 1];
     const bom = ehRec ? d >= 0 : d <= 0;
@@ -624,8 +648,8 @@
     $('total-contas').style.color = total < 0 ? '#FF453A' : '';
     const comLim = cs.filter(r => r.limite > 0);
     $('total-limite').hidden = !comLim.length;
-    if (comLim.length) $('total-limite').textContent = comLim.map(r => r.conta + ': ainda podes usar ' + eur(Math.max(0, r.disponivel)) + (r.usado > 0 ? ' (já usaste ' + eur(r.usado) + ' dos ' + eur(r.limite) + ' da Conta Ordenado)' : ' (Conta Ordenado por usar)')).join(' · ');
-    $('total-nota').textContent = acertadas === cs.length ? 'Todas as contas acertadas com o saldo real' : acertadas ? acertadas + ' de ' + cs.length + ' contas acertadas com o saldo real' : 'Saldos calculados: toca no lápis de cada conta para pores o saldo real';
+    if (comLim.length) $('total-limite').textContent = comLim.map(r => r.conta + ': ainda pode usar ' + eur(Math.max(0, r.disponivel)) + (r.usado > 0 ? ' (já usou ' + eur(r.usado) + ' dos ' + eur(r.limite) + ' da Conta Ordenado)' : ' (Conta Ordenado por usar)')).join(' · ');
+    $('total-nota').textContent = acertadas === cs.length ? 'Todas as contas acertadas com o saldo real' : acertadas ? acertadas + ' de ' + cs.length + ' contas acertadas com o saldo real' : 'Saldos calculados: toque no lápis de cada conta para pôr o saldo real';
     $('tiles').replaceChildren(...cs.map((r, i) => {
       const t = el('div', 'tile' + (S.conta === r.conta ? ' on' : ''));
       const b = el('button', 'tile-main'); b.type = 'button'; b.setAttribute('aria-pressed', S.conta === r.conta);
@@ -731,8 +755,8 @@
   // ---------- 6. Pagamentos fixos (e receitas fixas) ----------
   const pad2 = n => String(n).padStart(2, '0');
   const diasEntre = (a, b) => Math.round((new Date(b + 'T12:00') - new Date(a + 'T12:00')) / 864e5);
-  function fixos(tipo) {
-    tipo = tipo || 'Despesa';
+  function fixos(tipo) { tipo = tipo || 'Despesa'; return memo('fixos:' + tipo, () => fixosCalc(tipo)); }
+  function fixosCalc(tipo) {
     const hj = hoje(), mA = hj.slice(0, 7), ult = []; let k = mA;
     for (let i = 0; i < 6; i++) { k = prevMes(k); ult.push(k); }
     const by = new Map();
@@ -976,7 +1000,18 @@
     aplicaTab();
     if (mudou) window.scrollTo(0, 0);
   }
-  document.querySelectorAll('#tabbar [data-ir]').forEach(b => b.addEventListener('click', () => irPara(b.dataset.ir)));
+  // O Safari no iPhone às vezes engole o "click" (ao tocar durante o deslizar da página ou junto à barra de baixo).
+  // Por isso o menu reage logo ao levantar o dedo, e o click fica como reserva.
+  let toqueTab = null;
+  document.querySelectorAll('#tabbar [data-ir]').forEach(b => {
+    b.addEventListener('pointerdown', e => { toqueTab = { b, x: e.clientX, y: e.clientY }; });
+    b.addEventListener('pointerup', e => {
+      const t = toqueTab; toqueTab = null;
+      if (t && t.b === b && Math.abs(e.clientX - t.x) < 12 && Math.abs(e.clientY - t.y) < 12) irPara(b.dataset.ir);
+    });
+    b.addEventListener('pointercancel', () => { toqueTab = null; });
+    b.addEventListener('click', () => irPara(b.dataset.ir));
+  });
   document.querySelectorAll('#ajustes [data-clica]').forEach(b => b.addEventListener('click', () => { const alvo = $(b.dataset.clica); if (alvo) alvo.click(); }));
   $('ini-total').addEventListener('click', () => $('abrir-total').click());
   $('ver-todos').addEventListener('click', () => irPara('movimentos'));
@@ -1001,7 +1036,7 @@
     for (const r of rows.slice(0, N)) {
       if (r.data !== last) { out.push(el('li', 'txhead', fmtD(r.data))); last = r.data; }
       const li = el('li', 'tx-wrap'), row = el('div', 'tx'), mid = el('div'); mid.style.minWidth = '0';
-      mid.append(el('div', 'tx-t', r.categoria), el('div', 'tx-s', [r.manual ? (r.serie ? 'Manual · repete' : 'Manual') : '', r.grupo, (r.tags || []).map(t => '#' + t).join(' '), r.conta].filter(Boolean).join(' · ')));
+      mid.append(el('div', 'tx-t', r.categoria), el('div', 'tx-s', [r.manual ? (r.serie ? 'Manual · repete' : 'Manual') : '', (r.tags || []).map(t => '#' + t).join(' '), r.conta].filter(Boolean).join(' · ')));
       const ti = el('div', 'tx-ico', ico(r.categoria)); ti.style.background = gcol(r.grupo); aplicaCapa(ti, r.categoria);
       row.append(ti, mid, el('div', 'tx-v' + (r.tipo === 'Transferência' ? ' mov' : r.montante > 0 ? ' pos' : ''), (r.montante > 0 ? '+' : '') + eur(r.montante)));
       const act = el('div', 'tx-act');
@@ -1028,7 +1063,7 @@
 
   function useData(res, cache) {
     S.base = parseExport(res.text); compose();
-    const rows = S.rows; S.meta = { name: res.name, modified: res.modified, origem: res.origem };
+    const rows = S.rows; S.meta = { name: res.name, modified: res.modified, rev: res.rev, origem: res.origem };
     if (S.mes && !rows.some(r => r.mes === S.mes)) S.mes = '';
     if (S.ano && !rows.some(r => r.mes.startsWith(S.ano))) S.ano = '';
     if (cache) store.set(CFG.cache, JSON.stringify({ ...S.meta, text: res.text }));
@@ -1044,12 +1079,12 @@
     busy = true; lastRefresh = Date.now();
     btn.classList.add('busy'); btn.setAttribute('aria-busy', 'true');
     try {
-      const res = await latestFromDropbox();
+      // na atualização automática só descarrega o ficheiro se for outro ou tiver mudado
+      const res = await latestFromDropbox(auto && S.rows.length ? S.meta : null);
       let manMudou = false; try { manMudou = await loadManuais(); } catch (e) {}
       carregaCapas();
       S.checked = new Date();
-      const mudou = !S.meta || S.meta.name !== res.name || S.meta.modified !== res.modified || S.rows.length === 0 || !auto;
-      if (mudou) useData(res, true); else { if (manMudou) { compose(); render(); } showSource(S.meta); }
+      if (!res.igual) useData(res, true); else { if (manMudou) { compose(); render(); } showSource(S.meta); }
     }
     catch (e) { showSource(S.meta, e.message); if (!S.rows.length) render(); }
     finally { busy = false; btn.classList.remove('busy'); btn.removeAttribute('aria-busy'); }
@@ -1105,7 +1140,6 @@
   const posC = c => { const i = ORDEM_C.findIndex(re => re.test(c)); return i < 0 ? 99 : i; };
   const listaContas = () => [...new Set(contas().map(c => c.conta).concat(M.contas))].sort((a, b) => posC(a) - posC(b) || a.localeCompare(b, 'pt'));
   const listaCats = () => [...new Set(S.rows.filter(r => r.tipo !== 'Transferência').map(r => r.categoria))].sort((a, b) => a.localeCompare(b, 'pt'));
-  const fmtValor = v => L.format(',.2f')(v);
 
   let toastT;
   function toast(msg, erro) {
@@ -1151,7 +1185,6 @@
   const REP = { nunca: 'Nunca', semanal: 'Todas as semanas', mensal: 'Todos os meses', anual: 'Todos os anos' };
   const F = {};
   let fEdit = null;
-  const fmtMontante = s => (s ? s.replace(/^(\d+)/, d => L.format(',')(+d)) : '0') + (s && s.includes(',') ? '' : ',00');
   function fDesenha() {
     $('f-title').textContent = F.tipo;
     $('f-tipo').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === F.tipo));
@@ -1306,7 +1339,7 @@
   $('f-ok').addEventListener('click', () => {
     if (!$('calc').hidden && C) F.valor = String(calcAvalia(C)).replace('.', ',');
     const v = F.valor ? parseFloat(F.valor.replace(',', '.')) : 0; const data = $('f-data').value;
-    const erro = !(v > 0) ? 'Toca em Montante e escreve o valor.' : !/^\d{4}-\d{2}-\d{2}$/.test(data) ? 'Escolhe a data.' : !F.conta ? 'Escolhe a conta.' : !F.categoria ? 'Escolhe a categoria.' : '';
+    const erro = !(v > 0) ? 'Toque em Montante e escreva o valor.' : !/^\d{4}-\d{2}-\d{2}$/.test(data) ? 'Escolha a data.' : !F.conta ? 'Escolha a conta.' : !F.categoria ? 'Escolha o comerciante.' : '';
     if (erro) { $('f-msg').textContent = erro; return; }
     const mov = { data, hora: $('f-hora').value || '', tipo: F.tipo, montante: F.tipo === 'Receita' ? v : -v, conta: F.conta, categoria: F.categoria, etiquetas: F.etiquetas || '',
       repetir: F.repetir && F.repetir !== 'nunca' ? F.repetir : undefined, titulo: $('f-titulo').value.trim() || undefined, recebedor: $('f-receb').value.trim() || undefined, uso: $('f-uso').value.trim() || undefined };
@@ -1349,7 +1382,7 @@
     if (lt && !(lim >= 0)) { $('a-msg').textContent = 'O limite tem de ser um número, por exemplo 500.'; return; }
     M.limites = M.limites || {}; M.limites[acertoConta.conta] = Math.round(lim * 100) / 100;
     if (!txt) { fechar('sh-acerto'); saveManuais('Limite de ' + acertoConta.conta + ' guardado'); return; }
-    if (!isFinite(v)) { $('a-msg').textContent = 'Escreve o saldo que a app do banco mostra, por exemplo 1234,56.'; return; }
+    if (!isFinite(v)) { $('a-msg').textContent = 'Escreva o saldo que a app do banco mostra, por exemplo 1234,56.'; return; }
     M.saldos[acertoConta.conta] = { real: Math.round(v * 100) / 100, calc: Math.round(acertoConta.calc * 100) / 100, em: new Date().toISOString() };
     if (!S.rows.some(r => r.conta === acertoConta.conta) && !M.contas.includes(acertoConta.conta)) M.contas.push(acertoConta.conta);
     fechar('sh-acerto'); saveManuais('Saldo de ' + acertoConta.conta + ' acertado');
@@ -1423,8 +1456,8 @@
     const acertadas = itens.filter(i => i.acerto).length;
     const limTv = itens.filter(i => i.limite > 0);
     $('tv-limite').hidden = !limTv.length;
-    if (limTv.length) $('tv-limite').textContent = limTv.map(i => 'Conta Ordenado ' + i.conta + ': ainda podes usar ' + tvEuro(Math.max(0, i.disponivel), escT) + ' de ' + tvEuro(i.limite, escT)).join(' · ');
-    $('tv-acertos').textContent = acertadas === itens.length ? 'Todas as contas acertadas com o saldo real' : acertadas ? acertadas + ' de ' + itens.length + ' contas acertadas com o saldo real' : 'Saldos calculados: toca no lápis de cada conta para pores o saldo real';
+    if (limTv.length) $('tv-limite').textContent = limTv.map(i => 'Conta Ordenado ' + i.conta + ': ainda pode usar ' + tvEuro(Math.max(0, i.disponivel), escT) + ' de ' + tvEuro(i.limite, escT)).join(' · ');
+    $('tv-acertos').textContent = acertadas === itens.length ? 'Todas as contas acertadas com o saldo real' : acertadas ? acertadas + ' de ' + itens.length + ' contas acertadas com o saldo real' : 'Saldos calculados: toque no lápis de cada conta para pôr o saldo real';
     const hh = $('tv-total').querySelector('.tv-hero-head'); hh.replaceChild(tvBotaoOlho('__total', escT, 'total'), hh.querySelector('.tv-reveal'));
     $('tv-total-amount').textContent = tvEuro(total, escT);
     const atencao = itens.filter(i => tvEstado(i.disponivel)).length, st = tvEstado(total);
@@ -1567,9 +1600,9 @@
     const sem = el('button', 'fo-item fo-sem', cat.startsWith('conta:') ? 'Sem imagem' : 'Sem capa'); sem.type = 'button';
     sem.onclick = () => { if (M.capas) delete M.capas[cat]; fechar('sh-fotos'); volta(); saveManuais('Imagem removida'); };
     grelha.append(sem);
-    if (!ligado()) { $('fo-msg').textContent = 'Liga o Dropbox nas definições para veres as fotos.'; return; }
+    if (!ligado()) { $('fo-msg').textContent = 'Ligue o Dropbox em Ajustes para ver as fotos.'; return; }
     let fotos;
-    try { fotos = await carregaFotos(); } catch (e) { $('fo-msg').textContent = /not_found/.test(e.summary || '') ? 'Não encontrei a pasta ' + fotosPasta() + '. Cria-a no Dropbox e põe lá as fotos.' : e.message; return; }
+    try { fotos = await carregaFotos(); } catch (e) { $('fo-msg').textContent = /not_found/.test(e.summary || '') ? 'Não encontrei a pasta ' + fotosPasta() + '. Crie-a no Dropbox e ponha lá as fotos.' : e.message; return; }
     if (!fotos.length) { $('fo-msg').textContent = 'A pasta ' + fotosPasta() + ' não tem imagens.'; return; }
     const atual = M.capas && M.capas[cat];
     const botoes = fotos.map(f => {
@@ -1645,14 +1678,14 @@
   // Regras: comerciante (categoria) -> hashtags
   function abrirTags() {
     const cats = listaCats();
-    $('tg-cat').replaceChildren(new Option('Escolhe o comerciante', ''), ...cats.map(c => new Option(c, c)));
+    $('tg-cat').replaceChildren(new Option('Escolha o comerciante', ''), ...cats.map(c => new Option(c, c)));
     $('dl-tags').replaceChildren(...todasTags().map(t => new Option('#' + t)));
     $('tg-tag').value = ''; $('tg-msg').textContent = '';
     desenhaRegras(); abrir('sh-tags');
   }
   function desenhaRegras() {
     const regras = Object.entries(M.regras || {}).filter(([, ts]) => ts && ts.length).sort((a, b) => a[0].localeCompare(b[0], 'pt'));
-    if (!regras.length) { $('tg-list').replaceChildren(el('p', 'empty', 'Ainda não tens regras. Escolhe um comerciante e escreve a hashtag.')); return; }
+    if (!regras.length) { $('tg-list').replaceChildren(el('p', 'empty', 'Ainda não tem regras. Escolha um comerciante e escreva a hashtag.')); return; }
     $('tg-list').replaceChildren(...regras.flatMap(([cat, ts]) => ts.map(t => {
       const row = el('div', 'mf-row');
       const i = el('span', 'mf-ico', ico(cat)); i.style.background = gcol(grupoDe(cat, '', 'Despesa')); i.style.color = '#fff'; i.style.fontWeight = '700'; aplicaCapa(i, cat);
@@ -1664,8 +1697,8 @@
   }
   $('tg-add').addEventListener('click', () => {
     const cat = $('tg-cat').value, t = limpaTag($('tg-tag').value);
-    if (!cat) { $('tg-msg').textContent = 'Escolhe o comerciante.'; return; }
-    if (!t) { $('tg-msg').textContent = 'Escreve a hashtag, por exemplo #Alimentação.'; return; }
+    if (!cat) { $('tg-msg').textContent = 'Escolha o comerciante.'; return; }
+    if (!t) { $('tg-msg').textContent = 'Escreva a hashtag, por exemplo #Alimentação.'; return; }
     M.regras = M.regras || {}; M.regras[cat] = [...new Set((M.regras[cat] || []).concat(t))];
     $('tg-tag').value = ''; $('tg-msg').textContent = ''; desenhaRegras(); saveManuais('Todos os movimentos de ' + cat + ' passam a ter #' + t);
   });
@@ -1701,8 +1734,8 @@
   $('ls-tipo').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { LE.tipo = b.dataset.v; $('ls-tipo').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }));
   $('ls-ok').addEventListener('click', () => {
     const nome = $('ls-nome').value.trim();
-    if (!nome) { $('ls-msg').textContent = 'Dá um nome à lista, por exemplo Supermercado.'; return; }
-    if (!LE.tags.size && !LE.cats.size && !LE.contas.size && LE.tipo === 'Tudo') { $('ls-msg').textContent = 'Escolhe pelo menos uma hashtag, comerciante, conta ou tipo.'; return; }
+    if (!nome) { $('ls-msg').textContent = 'Dê um nome à lista, por exemplo Supermercado.'; return; }
+    if (!LE.tags.size && !LE.cats.size && !LE.contas.size && LE.tipo === 'Tudo') { $('ls-msg').textContent = 'Escolha pelo menos uma hashtag, comerciante, conta ou tipo.'; return; }
     const l = { id: LE.id || novoId(), nome, tipo: LE.tipo, tags: [...LE.tags], cats: [...LE.cats], contas: [...LE.contas] };
     M.listas = (M.listas || []).filter(x => x.id !== l.id).concat(l);
     S.lista = l.id; S.tag = '';
