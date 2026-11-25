@@ -1087,6 +1087,21 @@
     { id: 'indigo', ink: '#2a2868', hneg: '#ffb4ab', nome: 'Índigo e celadon', nuvi: 1, page: '#f1f6f0', panel: '#ffffff', fg: '#2a2868', muted: '#5f6189', ac: '#c39a1e', acTxt: '#1f1d4f', bc: 'rgba(42,40,104,.25)', g: 'linear-gradient(135deg,#3d3b8f,#2a2868)', hero: '#f1f6f0', soft: '#e8e8f3', d: ['#dbe8dc', '#2a2868', '#c39a1e'] }];
   const TEMA_ANTIGO = { areia: 'sand', menta: 'green', papel: 'aveia', floresta: 'green', lavanda: 'indigo', cereja: 'pink' };
   TEMAS.forEach(t => { if (!t.d) t.d = [t.panel, t.ac, t.bg[1]]; });
+  // a barra das horas do iPhone fica exatamente da cor do topo da página (como no nuvifit)
+  function corBarraTopo() {
+    requestAnimationFrame(() => {
+      const t = document.createElement('div');
+      t.style.cssText = 'position:absolute;width:0;height:0;background:color-mix(in srgb,var(--bg1) 16%,var(--page))';
+      document.body.appendChild(t); const c = getComputedStyle(t).backgroundColor; t.remove();
+      const n = (c.match(/[\d.]+/g) || []).map(Number); let rgb;
+      if (/^color\(/.test(c)) rgb = n.slice(0, 3).map(x => Math.round(x * 255)); else rgb = n.slice(0, 3);
+      const hex = rgb.length === 3 ? '#' + rgb.map(x => Math.max(0, Math.min(255, x)).toString(16).padStart(2, '0')).join('') : '';
+      if (!hex) return;
+      document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.removeAttribute('media'); m.content = hex; });
+      document.documentElement.style.background = hex;
+    });
+  }
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', corBarraTopo); } catch (e) {}
   function aplicaTema(id) {
     const t = TEMAS.find(x => x.id === id) || TEMAS[0];
     let st = document.getElementById('tema-css'); if (!st) { st = document.createElement('style'); st.id = 'tema-css'; document.head.appendChild(st); }
@@ -1100,8 +1115,7 @@
     st.textContent = css;
     // os temas claros/escuros mandam também nos ecrãs que seguiam o modo do iPhone (ecrã do saldo, teclado, formulário)
     if (t.page) document.documentElement.dataset.esc = t.esc ? 'dark' : 'light'; else delete document.documentElement.dataset.esc;
-    // cor da barra das horas no iPhone = fundo do tema
-    requestAnimationFrame(() => { const cor = getComputedStyle(document.documentElement).getPropertyValue('--page').trim() || '#f6efe9'; document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = cor; }); });
+    corBarraTopo();
     $('temas').querySelectorAll('.tema').forEach(b => b.setAttribute('aria-checked', String(b.dataset.id === t.id)));
   }
   $('temas').replaceChildren(...TEMAS.map(t => {
