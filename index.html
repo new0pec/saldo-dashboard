@@ -26,7 +26,7 @@ body.bloqueado .ios{overflow:hidden}
 body::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);z-index:12;pointer-events:none;background:color-mix(in srgb,var(--page) 82%,transparent);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
 body{color:var(--fg);font-family:-apple-system,"SF Pro Text","SF Pro Display",system-ui,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit}
-.ios{position:relative;z-index:1;isolation:isolate;box-sizing:border-box;height:100%;height:100dvh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:calc(env(safe-area-inset-top) + 8px) max(14px,calc((100% - 1100px) / 2)) calc(120px + env(safe-area-inset-bottom))}
+.ios{position:fixed;inset:0;z-index:1;isolation:isolate;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:calc(env(safe-area-inset-top) + 8px) max(14px,calc((100% - 1100px) / 2)) calc(120px + env(safe-area-inset-bottom))}
 .ios-bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:linear-gradient(180deg,color-mix(in srgb,var(--bg1) 16%,var(--page)) 0%,color-mix(in srgb,var(--bg2) 13%,var(--page)) 55%,color-mix(in srgb,var(--bg3) 12%,var(--page)) 100%)}
 .ios-bg .orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.5}
 .ios-bg .o1{width:460px;height:460px;left:-140px;top:-120px;background:radial-gradient(circle,var(--o1),transparent 65%)}
@@ -578,6 +578,40 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 [hidden]{display:none!important}
 @media (max-width:520px){.title{font-size:34px}.hero-num{font-size:38px}.ring{width:132px;height:132px}.ring-c strong{font-size:25px}.ring-c span{max-width:72px}}
 @media (prefers-reduced-motion:no-preference){.card,.tile{animation:in .5s cubic-bezier(.2,.8,.2,1) both}@keyframes in{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}}
+
+/* ===== Design nuvifit: cartões de vidro com contorno fino, menu em comprimido, títulos de secção ===== */
+:root{--bc:var(--line);--orb-op:.5;--spring:cubic-bezier(.2,.9,.25,1.1);--ease:cubic-bezier(.25,.8,.25,1)}
+.ios-bg .orb{opacity:var(--orb-op)}
+.card,.tile,.kpi{border-radius:26px;border:1px solid var(--bc);box-shadow:0 0 0 .5px var(--bc),inset 0 1px 0 rgba(255,255,255,.55),0 3px 8px -3px rgba(60,45,25,.12),0 14px 28px -14px rgba(60,45,25,.26)}
+.card:active,.kpi:active,.tile-main:active,.rq:active,.aj:active{transition:transform .25s var(--spring)}
+.kpi:active,.rq:active{transform:scale(.97)}
+.sh-sub,.eyebrow{font-size:12.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.card-head h2{letter-spacing:-.02em}
+/* destaque com gradiente, como o cartão principal do nuvifit */
+#resumo,.total-card{background:var(--g,color-mix(in srgb,var(--panel) 70%,transparent));color:var(--hero-ink,inherit)}
+#resumo .label,#resumo .muted,.total-card .label,.total-card .hint,.total-card .total-lim,.total-card .tv-ver{color:color-mix(in srgb,var(--hero-ink,var(--fg)) 70%,transparent)}
+/* menu de baixo */
+.tabbar{left:14px;right:14px;bottom:max(env(safe-area-inset-bottom),18px);height:66px;padding:0 6px;align-items:center;border-radius:33px;border:1px solid var(--bc);box-shadow:0 0 0 .5px var(--bc),inset 0 1px 0 rgba(255,255,255,.6),0 3px 8px -3px rgba(60,45,25,.14),0 12px 24px -12px rgba(60,45,25,.28)}
+.tabbar button{height:56px;min-height:56px;border-radius:28px;border:0;font-size:10.5px;font-weight:600;color:var(--muted);transition:all .3s var(--ease)}
+.tabbar svg{filter:drop-shadow(0 1.5px 1.5px rgba(60,40,20,.22));transition:transform .35s var(--spring)}
+.tabbar button[aria-selected="true"]{color:var(--ac);background:color-mix(in srgb,var(--panel) 80%,transparent);box-shadow:inset 0 0 0 1px var(--ac),0 4px 12px -4px rgba(0,0,0,.12);border:0}
+.tabbar button[aria-selected="true"] svg{transform:translateY(-1px) scale(1.06)}
+.fab{bottom:calc(max(env(safe-area-inset-bottom),18px) + 80px)}
+.toast{bottom:calc(max(env(safe-area-inset-bottom),18px) + 150px)}
+.hsoma{bottom:calc(max(env(safe-area-inset-bottom),18px) + 78px)}
+.ios{padding-bottom:calc(max(env(safe-area-inset-bottom),18px) + 96px)}
+/* listas de definições agrupadas num só cartão, com ícones em círculo suave */
+.aj-lista{gap:0;border-radius:26px;overflow:hidden;border:1px solid var(--bc);background:color-mix(in srgb,var(--panel) 70%,transparent);box-shadow:0 0 0 .5px var(--bc),0 3px 8px -3px rgba(60,45,25,.12)}
+.aj{border:0;border-radius:0;background:transparent;padding:14px 16px;gap:14px}
+.aj+.aj{border-top:1px solid var(--line)}
+.aj-i{width:44px;height:44px;flex:0 0 44px;border-radius:50%;background:var(--th-soft,color-mix(in srgb,var(--ac) 14%,transparent));color:var(--ac);font-size:18px}
+.aj b{font-size:16.5px;font-weight:700}
+.aj small{font-size:13.5px;line-height:1.35}
+#ajustes{background:transparent;border:0;box-shadow:none;padding:0}
+#ajustes>.card-head{padding:0 4px}
+#ajustes .temas{padding:0}
+.total-card .total-lim,.total-card .tv-ver{font-weight:700}
+.tema{border-radius:16px;background:color-mix(in srgb,var(--panel) 60%,transparent)}
 </style>
 </head>
 <body>
@@ -1048,6 +1082,6 @@ body.tab-ajustes .fab,body.sem-dados .tabbar{display:none}
 
 <input type="file" id="file" accept=".txt,.csv,text/plain,text/csv" hidden>
 
-<script src="app.js?v=202611250310"></script>
+<script src="app.js?v=202611250337"></script>
 </body>
 </html>

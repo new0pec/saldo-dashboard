@@ -1074,23 +1074,31 @@
   aplicaPrivado();
 
   // ---------- Temas ----------
+  // 4 temas escuros da Saldo + os 6 temas de cor do nuvifit
   const TEMAS = [
     { id: 'por-do-sol', nome: 'Pôr do sol', d: ['#2b1a1c', '#FF9F0A', '#FF375F'] },
     { id: 'oceano', nome: 'Oceano', page: '#06131f', panel: '#0f2232', fg: '#f2f7fb', muted: '#9db4c6', ac: '#2AC3DE', acTxt: '#00222b', bg: ['#0A84FF', '#2AC3DE', '#1d4ed8'], o: ['#64D2FF', '#0A84FF', '#2AC3DE', '#5E5CE6'], esc: 1 },
-    { id: 'floresta', nome: 'Floresta', page: '#07140d', panel: '#102419', fg: '#eef7f1', muted: '#a3bfae', ac: '#5DD39E', acTxt: '#062014', bg: ['#30D158', '#C9E265', '#0f766e'], o: ['#C9E265', '#5DD39E', '#30D158', '#0f766e'], esc: 1 },
-    { id: 'lavanda', nome: 'Lavanda', page: '#120d22', panel: '#1f1834', fg: '#f4f0ff', muted: '#b3a9cc', ac: '#B79CFF', acTxt: '#1b1035', bg: ['#B79CFF', '#FF8AD8', '#5E5CE6'], o: ['#FF8AD8', '#B79CFF', '#5E5CE6', '#BF5AF2'], esc: 1 },
     { id: 'grafite', nome: 'Grafite', page: '#101012', panel: '#1c1c1f', fg: '#f5f5f7', muted: '#a1a1a6', ac: '#C6F432', acTxt: '#111', bg: ['#636366', '#3a3a3c', '#48484a'], o: ['#3a3a3c', '#48484a', '#2c2c2e', '#3a3a3c'], esc: 1 },
-    { id: 'areia', nome: 'Areia', page: '#f4ede3', panel: '#fffdf9', fg: '#2d2a26', muted: '#7d756b', ac: '#C8553D', acTxt: '#fff', bg: ['#E9C46A', '#C8553D', '#6B7F6A'], o: ['#F4D58D', '#E9A178', '#C8553D', '#A3B18A'], esc: 0 },
-    { id: 'menta', nome: 'Menta', page: '#eaf7f1', panel: '#ffffff', fg: '#10302a', muted: '#5f7a72', ac: '#14A37F', acTxt: '#fff', bg: ['#14A37F', '#2D7DD2', '#9BE7C4'], o: ['#9BE7C4', '#14A37F', '#64D2FF', '#2D7DD2'], esc: 0 },
     { id: 'neon', nome: 'Meia-noite neon', page: '#05060a', panel: '#10111a', fg: '#f5f7ff', muted: '#8f93a8', ac: '#00E5FF', acTxt: '#001018', bg: ['#00E5FF', '#FF2E93', '#6d28d9'], o: ['#00E5FF', '#FF2E93', '#6d28d9', '#00E5FF'], esc: 1 },
-    { id: 'cereja', nome: 'Cereja', page: '#17050b', panel: '#2a0d16', fg: '#fff4f5', muted: '#c9a8ae', ac: '#F2C14E', acTxt: '#2a0d16', bg: ['#FF5D73', '#9f1239', '#F2C14E'], o: ['#F2C14E', '#FF5D73', '#9f1239', '#FF5D73'], esc: 1 },
-    { id: 'papel', nome: 'Papel', page: '#f5f5f7', panel: '#ffffff', fg: '#111111', muted: '#6e6e73', ac: '#111111', acTxt: '#fff', bg: ['#e5e5ea', '#f2f2f7', '#d1d1d6'], o: ['#e5e5ea', '#ffffff', '#d1d1d6', '#e5e5ea'], esc: 0 }];
+    { id: 'aveia', nome: 'Aveia', nuvi: 1, page: '#f7f3ec', panel: '#ffffff', fg: '#1d1a1f', muted: '#6c6670', ac: '#8f7d5e', acTxt: '#fff', bc: 'rgba(163,145,113,.5)', g: 'linear-gradient(135deg,#e2d7c2,#b6a584)', hero: '#33291a', soft: '#efe7da', d: ['#f7f3ec', '#33291a', '#8f7d5e'] },
+    { id: 'teal', nome: 'Carvão e marinho', nuvi: 1, page: '#fbf7f1', panel: '#ffffff', fg: '#3d3636', muted: '#7a7070', ac: '#dba583', acTxt: '#202d5f', bc: 'rgba(32,45,95,.28)', g: 'linear-gradient(135deg,#2e3d78,#202d5f)', hero: '#fbf7f1', soft: '#e9e6ef', d: ['#f1ebe3', '#202d5f', '#dba583'] },
+    { id: 'pink', nome: 'Creme e tinta', nuvi: 1, page: '#fbf7f0', panel: '#ffffff', fg: '#1b1a20', muted: '#6a6670', ac: '#e2457f', acTxt: '#fff', bc: 'rgba(27,26,32,.22)', g: 'linear-gradient(135deg,#2e2c35,#1b1a20)', hero: '#fbf7f0', soft: '#f6e4ea', d: ['#f3ece1', '#1b1a20', '#e2457f'] },
+    { id: 'green', nome: 'Verde-garrafa', nuvi: 1, page: '#f7f4ec', panel: '#ffffff', fg: '#123d2c', muted: '#5b6f63', ac: '#e2402b', acTxt: '#fff', bc: 'rgba(18,61,44,.26)', g: 'linear-gradient(135deg,#1f5a41,#123d2c)', hero: '#f7f4ec', soft: '#e3ebe2', d: ['#ebe5d7', '#123d2c', '#e2402b'] },
+    { id: 'sand', nome: 'Areia e terracota', nuvi: 1, page: '#faf3e7', panel: '#ffffff', fg: '#3b2a22', muted: '#7d6656', ac: '#2450c8', acTxt: '#fff', bc: 'rgba(184,92,58,.4)', g: 'linear-gradient(135deg,#cc6b47,#a84e30)', hero: '#fff6ec', soft: '#f3dccf', d: ['#efe2cd', '#a84e30', '#2450c8'] },
+    { id: 'indigo', nome: 'Índigo e celadon', nuvi: 1, page: '#f1f6f0', panel: '#ffffff', fg: '#2a2868', muted: '#5f6189', ac: '#c39a1e', acTxt: '#1f1d4f', bc: 'rgba(42,40,104,.25)', g: 'linear-gradient(135deg,#3d3b8f,#2a2868)', hero: '#f1f6f0', soft: '#e8e8f3', d: ['#dbe8dc', '#2a2868', '#c39a1e'] }];
+  const TEMA_ANTIGO = { areia: 'sand', menta: 'green', papel: 'aveia', floresta: 'green', lavanda: 'indigo', cereja: 'pink' };
   TEMAS.forEach(t => { if (!t.d) t.d = [t.panel, t.ac, t.bg[1]]; });
   function aplicaTema(id) {
     const t = TEMAS.find(x => x.id === id) || TEMAS[0];
     let st = document.getElementById('tema-css'); if (!st) { st = document.createElement('style'); st.id = 'tema-css'; document.head.appendChild(st); }
-    st.textContent = t.page ? ':root{color-scheme:' + (t.esc ? 'dark' : 'light') + ';--page:' + t.page + ';--panel:' + t.panel + ';--fg:' + t.fg + ';--muted:' + t.muted + ';--line:' + (t.esc ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.09)') +
-      ';--ac:' + t.ac + ';--ac-txt:' + t.acTxt + ';--bg1:' + t.bg[0] + ';--bg2:' + t.bg[1] + ';--bg3:' + t.bg[2] + ';--o1:' + t.o[0] + ';--o2:' + t.o[1] + ';--o3:' + t.o[2] + ';--o4:' + t.o[3] + '}' : '';
+    let css = '';
+    if (t.page) {
+      css = ':root{color-scheme:' + (t.esc ? 'dark' : 'light') + ';--page:' + t.page + ';--panel:' + t.panel + ';--fg:' + t.fg + ';--muted:' + t.muted + ';--line:' + (t.esc ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)') + ';--ac:' + t.ac + ';--ac-txt:' + t.acTxt;
+      if (t.nuvi) css += ';--bc:' + t.bc + ';--g:' + t.g + ';--hero-ink:' + t.hero + ';--th-soft:' + t.soft + ';--orb-op:0;--bg1:' + t.page + ';--bg2:' + t.page + ';--bg3:' + t.page;
+      else css += ';--bg1:' + t.bg[0] + ';--bg2:' + t.bg[1] + ';--bg3:' + t.bg[2] + ';--o1:' + t.o[0] + ';--o2:' + t.o[1] + ';--o3:' + t.o[2] + ';--o4:' + t.o[3];
+      css += '}';
+    }
+    st.textContent = css;
     const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = t.page || '#FF9F0A';
     $('temas').querySelectorAll('.tema').forEach(b => b.setAttribute('aria-checked', String(b.dataset.id === t.id)));
   }
@@ -1100,7 +1108,7 @@
     b.append(d, el('span', '', t.nome)); b.onclick = () => { store.set('saldo.tema', t.id); aplicaTema(t.id); };
     return b;
   }));
-  aplicaTema(store.get('saldo.tema') || 'por-do-sol');
+  { const g = store.get('saldo.tema'); const id = TEMA_ANTIGO[g] || g || 'por-do-sol'; if (id !== g && g) store.set('saldo.tema', id); aplicaTema(id); }
 
   // ---------- Comparar anos ----------
   (() => { const s2 = $('anos-mes'); s2.replaceChildren(el('option', '', 'Ano inteiro'), ...MES.map((m, i) => { const o = el('option', '', m[0].toUpperCase() + m.slice(1)); o.value = pad2(i + 1); return o; })); s2.options[0].value = ''; s2.onchange = drawAnos; })();
