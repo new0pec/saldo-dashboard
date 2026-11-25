@@ -289,8 +289,8 @@
   async function saveManuais(okMsg) {
     store.set(MAN_KEY, JSON.stringify(M)); store.set(PEND_KEY, '1');
     compose(); render();
-    if (!ligado()) { toast('Guardado só neste dispositivo. Liga o Dropbox para sincronizar.'); return; }
-    return enviaManuais(okMsg || 'Guardado no Dropbox');
+    if (!ligado()) { if (okMsg !== null) toast('Guardado só neste dispositivo. Liga o Dropbox para sincronizar.'); return; }
+    return enviaManuais(okMsg === null ? '' : okMsg || 'Guardado no Dropbox');
   }
 
   function meses() {
@@ -1302,6 +1302,7 @@
       const bR = el('button', 'a-rep', 'Repetir'); bR.type = 'button'; bR.onclick = () => repetir(r);
       const bE = el('button', 'a-edit', 'Editar'); bE.type = 'button'; bE.onclick = () => abrirForm(r, !r.manual);
       act.append(bR, bE);
+      if (r.manual) { const bD = el('button', 'a-del', 'Apagar'); bD.type = 'button'; bD.onclick = () => apagarMov(r.id); act.append(bD); li.classList.add('tres'); }
       li.append(row, act); ligarDeslizar(li, row);
       out.push(li);
     }
@@ -1401,7 +1402,14 @@
   const listaCats = () => [...new Set(S.rows.filter(r => r.tipo !== 'Transferência').map(r => r.categoria))].sort((a, b) => a.localeCompare(b, 'pt'));
 
   let toastT;
+  function toastAcao(msg, rotulo, fn) {
+    const t = $('toast'); t.replaceChildren(el('span', '', msg)); t.classList.remove('erro');
+    const b = el('button', 'toast-b', rotulo); b.type = 'button'; b.onclick = () => { t.hidden = true; clearTimeout(toastT); fn(); }; t.append(b);
+    t.classList.add('com-acao'); t.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; t.classList.remove('com-acao'); }, 6000);
+  }
   function toast(msg, erro) {
+    $('toast').classList.remove('com-acao');
     const t = $('toast'); t.textContent = msg; t.classList.toggle('erro', !!erro); t.hidden = false;
     clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, erro ? 6000 : 2600);
   }
@@ -1418,7 +1426,16 @@
   document.querySelectorAll('.sheet-wrap').forEach(w => w.addEventListener('click', e => { if (e.target === w) fechar(w.id); }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.querySelectorAll('.sheet-wrap').forEach(w => { w.hidden = true; }); fecharCalc(); } });
 
-  function adicionar(mov) { M.movimentos.push({ id: novoId(), ...mov }); }
+  function adicionar(mov) { const id = novoId(); M.movimentos.push({ id, ...mov }); return id; }
+  // apaga um movimento posto na app, com «Anular» durante uns segundos
+  function apagarMov(id) {
+    const i = M.movimentos.findIndex(m => m.id === id); if (i < 0) return;
+    const m = M.movimentos[i], rep = m.repetir && m.repetir !== 'nunca';
+    if (rep && !window.confirm('Este movimento repete-se. Apagar também todas as repetições?')) return;
+    M.movimentos.splice(i, 1); fecharLinhas();
+    saveManuais(null);
+    toastAcao('Movimento apagado', 'Anular', () => { M.movimentos.splice(Math.min(i, M.movimentos.length), 0, m); saveManuais('Movimento reposto'); });
+  }
   function repetir(r) {
     adicionar({ data: hoje(), tipo: r.tipo, montante: r.montante, conta: r.conta, categoria: r.categoria, etiquetas: r.etiquetas || '' });
     fecharLinhas(); saveManuais('Repetido com a data de hoje');
@@ -1601,15 +1618,13 @@
     const mov = { data, hora: $('f-hora').value || '', tipo: F.tipo, montante: F.tipo === 'Receita' ? v : -v, conta: F.conta, categoria: F.categoria, etiquetas: F.etiquetas || '',
       repetir: F.repetir && F.repetir !== 'nunca' ? F.repetir : undefined, titulo: $('f-titulo').value.trim() || undefined, recebedor: $('f-receb').value.trim() || undefined, uso: $('f-uso').value.trim() || undefined };
     Object.keys(mov).forEach(k => mov[k] === undefined && delete mov[k]);
-    if (fEdit) { const i = M.movimentos.findIndex(m => m.id === fEdit); if (i >= 0) M.movimentos[i] = { id: fEdit, ...mov }; }
-    else adicionar(mov);
-    fechar('sh-form'); saveManuais(fEdit ? 'Movimento atualizado' : 'Movimento adicionado');
+    if (fEdit) { const i = M.movimentos.findIndex(m => m.id === fEdit); if (i >= 0) M.movimentos[i] = { id: fEdit, ...mov }; fechar('sh-form'); saveManuais('Movimento atualizado'); }
+    else {
+      const novo = adicionar(mov); fechar('sh-form'); saveManuais(null);
+      toastAcao('Movimento adicionado', 'Anular', () => { M.movimentos = M.movimentos.filter(m => m.id !== novo); saveManuais('Movimento anulado'); });
+    }
   });
-  $('f-del').addEventListener('click', () => {
-    if (!fEdit || !window.confirm('Apagar este movimento' + (F.repetir && F.repetir !== 'nunca' ? ' e todas as repetições?' : '?'))) return;
-    M.movimentos = M.movimentos.filter(m => m.id !== fEdit);
-    fechar('sh-form'); saveManuais('Movimento apagado');
-  });
+  $('f-del').addEventListener('click', () => { if (!fEdit) return; const id = fEdit; fechar('sh-form'); apagarMov(id); });
 
   // 2. Botão + abre o formulário já com o teclado
   $('fab').addEventListener('click', () => { abrirForm(null); C = ''; abrirCalc(); fDesenha(); });
